@@ -3,7 +3,7 @@ spring:
     name: 12pions-backend
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/twelvepions
+    url: jdbc:postgresql://localhost:5435/twelvepions
     username: twelvepions
     password: dev_only_change_in_prod
 
