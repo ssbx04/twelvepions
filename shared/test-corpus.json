@@ -1,0 +1,5 @@
+{
+  "comment": "Corpus de tests partagés. Chaque implémentation (Kotlin/Dart/TS) doit reproduire ces résultats. À étoffer en Phase 1.",
+  "version": 1,
+  "tests": []
+}
