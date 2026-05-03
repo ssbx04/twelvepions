@@ -7,7 +7,7 @@ package sn.twelvepions.game
  * Spec canonique : voir `shared/rules-spec.md`.
  */
 object Rules {
-
+    
     private val ORTHO = listOf(
         intArrayOf(1, 0),
         intArrayOf(-1, 0),
@@ -128,6 +128,38 @@ object Rules {
             }
         }
         return b
+    }
+
+    // ─── Conditions de fin de partie ─────────────────────────────────────────
+
+    /**
+     * Match nul automatique : chaque joueur n'a plus qu'**une seule pièce**.
+     * À vérifier après [autoPromoteLast] en fin de tour.
+     */
+    fun isOnePieceDraw(board: Board): Boolean =
+        board.count(Color.X) == 1 && board.count(Color.O) == 1
+
+    /**
+     * Calcule l'issue de la partie après un tour joué par [justPlayed].
+     * Retourne null si la partie continue.
+     *
+     * Ordre de vérification :
+     * 1. Capture totale de l'adversaire → victoire de [justPlayed].
+     * 2. Match nul 1v1 → Draw.
+     * 3. Adversaire bloqué → victoire de [justPlayed] par blocage.
+     */
+    fun computeOutcome(board: Board, justPlayed: Color): Outcome? {
+        val opponent = justPlayed.opponent()
+        if (board.count(opponent) == 0) {
+            return Outcome.Win(justPlayed, WinReason.CAPTURE_ALL)
+        }
+        if (isOnePieceDraw(board)) {
+            return Outcome.Draw
+        }
+        if (!hasAnyMove(board, opponent)) {
+            return Outcome.Win(justPlayed, WinReason.BLOCKED)
+        }
+        return null
     }
 
     // ─── Disponibilités ──────────────────────────────────────────────────────

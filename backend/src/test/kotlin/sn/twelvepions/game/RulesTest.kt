@@ -487,6 +487,74 @@ class RulesTest {
         assertEquals(Position(3, 2), seq[1].captured)
     }
 
+    // ─── Match nul 1v1 ────────────────────────────────────────────────────────
+
+    @Test
+    fun `isOnePieceDraw true when both colors have exactly one piece`() {
+        val b = Board.parse(
+            listOf(
+                "x....",
+                ".....",
+                ".....",
+                ".....",
+                "....o",
+            )
+        )
+        assertTrue(Rules.isOnePieceDraw(b))
+    }
+
+    @Test
+    fun `isOnePieceDraw false when one player has more pieces`() {
+        val b = Board.parse(
+            listOf(
+                "x....",
+                ".....",
+                ".....",
+                "..O..",
+                "....o",
+            )
+        )
+        assertFalse(Rules.isOnePieceDraw(b))
+    }
+
+    @Test
+    fun `computeOutcome returns Draw on 1 vs 1`() {
+        val b = Board.parse(
+            listOf(
+                "x....",
+                ".....",
+                ".....",
+                ".....",
+                "....o",
+            )
+        )
+        // X vient de jouer, mais peu importe : 1 vs 1 → Draw.
+        assertEquals(Outcome.Draw, Rules.computeOutcome(b, Color.X))
+    }
+
+    @Test
+    fun `computeOutcome returns Win CAPTURE_ALL when opponent has 0 pieces`() {
+        val b = Board.parse(
+            listOf(
+                "x....",
+                ".....",
+                ".....",
+                ".....",
+                ".....",
+            )
+        )
+        assertEquals(
+            Outcome.Win(Color.X, WinReason.CAPTURE_ALL),
+            Rules.computeOutcome(b, Color.X),
+        )
+    }
+
+    @Test
+    fun `computeOutcome returns null when game continues`() {
+        val b = Board.initial()
+        assertNull(Rules.computeOutcome(b, Color.X))
+    }
+
     // ─── Initial state : Vert commence et a des coups ────────────────────────
 
     @Test

@@ -102,9 +102,15 @@ pour le retirer du plateau.
 |---|---|
 | Un joueur capture le dernier pion adverse | Victoire par capture totale |
 | L'adversaire n'a plus aucun coup légal | Victoire par blocage |
+| **Chaque joueur n'a plus qu'une seule pièce** | **Match nul automatique** |
 | Accord mutuel | Match nul |
 | 3 demandes de match nul refusées | Forfait pour le demandeur |
 | Joueur abandonne | Forfait |
+
+> **Match nul automatique 1 vs 1** : dès que les deux joueurs sont réduits à
+> exactement une pièce chacun, la partie est un match nul. Avec la règle du
+> *lonely pion* (promotion automatique du dernier pion non-dame), il s'agit
+> en pratique d'un duel dame contre dame, considéré comme nul.
 
 ## Timing (en ligne)
 
