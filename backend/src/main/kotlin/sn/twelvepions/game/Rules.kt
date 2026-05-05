@@ -191,7 +191,14 @@ object Rules {
      * (captures forcées). Les chaînes de captures (Coudou) sont entièrement développées.
      */
     fun enumerateTurns(board: Board, color: Color): List<Turn> {
-        val captureTurns = mutableListOf<Turn>()
+        val captureTurns = enumerateCaptureTurns(board, color)
+        if (captureTurns.isNotEmpty()) return captureTurns
+        return enumerateSimpleTurns(board, color)
+    }
+
+    /** Tous les tours capturants (chaînes complètes). Vide si aucune capture possible. */
+    fun enumerateCaptureTurns(board: Board, color: Color): List<Turn> {
+        val out = mutableListOf<Turn>()
         for (r in 0 until BOARD_SIZE) for (c in 0 until BOARD_SIZE) {
             val p = board.at(r, c) ?: continue
             if (p.color != color) continue
@@ -199,22 +206,65 @@ object Rules {
                 val nb = applyMove(board, m)
                 val rest = continueChain(nb, m.to.r, m.to.c)
                 if (rest.isEmpty()) {
-                    captureTurns += Turn(listOf(m))
+                    out += Turn(listOf(m))
                 } else {
-                    for (sub in rest) captureTurns += Turn(listOf(m) + sub.sequence)
+                    for (sub in rest) out += Turn(listOf(m) + sub.sequence)
                 }
             }
         }
-        if (captureTurns.isNotEmpty()) return captureTurns
+        return out
+    }
 
-        // Pas de capture : coups simples.
-        val simples = mutableListOf<Turn>()
+    /** Tous les coups simples (1 saut sans capture). */
+    fun enumerateSimpleTurns(board: Board, color: Color): List<Turn> {
+        val out = mutableListOf<Turn>()
         for (r in 0 until BOARD_SIZE) for (c in 0 until BOARD_SIZE) {
             val p = board.at(r, c) ?: continue
             if (p.color != color) continue
-            for (m in simpleMoves(board, r, c)) simples += Turn(listOf(m))
+            for (m in simpleMoves(board, r, c)) out += Turn(listOf(m))
         }
-        return simples
+        return out
+    }
+
+    /**
+     * Positions courantes des pions qui auraient pu (ou dû) capturer si une
+     * capture était disponible et que [played] n'est pas une chaîne complète.
+     * Renvoie un ensemble vide si le coup n'est pas fautif.
+     *
+     * Si le pion fautif a bougé pendant [played] (coup simple ou chaîne
+     * interrompue), sa position originale est remplacée par sa position courante.
+     */
+    fun faultyPositions(boardBefore: Board, color: Color, played: Turn): Set<Position> {
+        val captureTurns = enumerateCaptureTurns(boardBefore, color)
+        if (captureTurns.isEmpty()) return emptySet()
+        if (captureTurns.any { it == played }) return emptySet()
+        val originals = captureTurns.map { it.sequence.first().from }.toSet()
+        val movedFrom = played.sequence.first().from
+        val movedTo = played.sequence.last().to
+        return originals.map { if (it == movedFrom) movedTo else it }.toSet()
+    }
+
+    /**
+     * Tous les tours « légalement jouables » incluant les coups fautifs au sens
+     * surplace : on autorise un coup simple ou une chaîne incomplète même quand
+     * une capture complète était disponible. La sanction se fait via OOPS.
+     */
+    fun enumerateAllLegalTurns(board: Board, color: Color): List<Turn> {
+        val captures = enumerateCaptureTurns(board, color)
+        val partials = mutableListOf<Turn>()
+        // Sous-séquences strictes des chaînes capturantes (Coudou interrompu).
+        for (t in captures) {
+            for (k in 1 until t.sequence.size) {
+                partials += Turn(t.sequence.take(k))
+            }
+        }
+        // Dédupliquer (plusieurs chaînes peuvent partager un même préfixe).
+        val seen = HashSet<Turn>()
+        val all = mutableListOf<Turn>()
+        for (t in captures + partials + enumerateSimpleTurns(board, color)) {
+            if (seen.add(t)) all += t
+        }
+        return all
     }
 
     private fun continueChain(board: Board, r: Int, c: Int): List<Turn> {

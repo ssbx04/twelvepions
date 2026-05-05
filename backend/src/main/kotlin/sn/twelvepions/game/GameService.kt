@@ -48,13 +48,17 @@ class GameService(
         return toDto(game)
     }
 
+    /** Résultat d'un coup. [faulty] non-vide ⇒ l'adversaire peut réclamer OOPS. */
+    data class MoveOutcome(val state: GameStateDto, val faulty: Set<Position>)
+
     /**
      * Applique un tour (séquence de coups) joué par [userId] sur la partie [gameId].
-     * Valide le tour contre la liste des tours légaux (capture forcée, chaîne, etc.).
+     * Autorise les coups simples ou chaînes incomplètes même si une capture
+     * était disponible (la sanction se fait via OOPS côté adversaire).
      * Si la partie se termine, met à jour l'ELO et stocke la fin.
      */
     @Transactional
-    fun applyMove(gameId: UUID, userId: UUID, sequence: List<MoveDto>): GameStateDto {
+    fun applyMove(gameId: UUID, userId: UUID, sequence: List<MoveDto>): MoveOutcome {
         val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
         if (game.status != GameStatus.IN_PROGRESS.name) throw GameNotActiveException()
 
@@ -62,11 +66,13 @@ class GameService(
         if (game.turn != playerColor.name) throw NotYourTurnException()
 
         val board = parseBoard(game.board)
-        val legalTurns = Rules.enumerateTurns(board, playerColor)
         val turn = sequenceToTurn(sequence)
-        if (legalTurns.none { it == turn }) {
+        val allLegal = Rules.enumerateAllLegalTurns(board, playerColor)
+        if (allLegal.none { it == turn }) {
             throw IllegalMoveException("ce coup ne fait pas partie des tours légaux")
         }
+
+        val faulty = Rules.faultyPositions(board, playerColor, turn)
 
         // Applique tous les coups de la séquence + promotion solo en fin de tour.
         var newBoard = board
@@ -84,11 +90,9 @@ class GameService(
             ),
         )
 
-        // Met à jour l'état du plateau.
         game.board = serializeBoard(newBoard)
         game.mustContinueFrom = null
 
-        // Vérifie l'issue.
         val outcome = Rules.computeOutcome(newBoard, playerColor)
         if (outcome != null) {
             handleEnd(game, outcome)
@@ -96,6 +100,71 @@ class GameService(
             game.turn = playerColor.opponent().name
         }
 
+        games.save(game)
+        return MoveOutcome(toDto(game), faulty)
+    }
+
+    /**
+     * Retire la pièce de l'adversaire en [target] suite à une réclamation OOPS
+     * acceptée. Ne change pas le tour. La validation « la cible est bien fautive »
+     * est faite en amont (registry runtime).
+     */
+    @Transactional
+    fun applyOopsRemoval(gameId: UUID, claimerId: UUID, target: Position): GameStateDto {
+        val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
+        if (game.status != GameStatus.IN_PROGRESS.name) throw GameNotActiveException()
+        val claimerColor = colorOf(game, claimerId) ?: throw NotAPlayerException()
+
+        val board = parseBoard(game.board)
+        val piece = board.at(target.r, target.c)
+            ?: throw IllegalMoveException("aucune pièce sur la position cible")
+        if (piece.color == claimerColor) {
+            throw IllegalMoveException("on ne retire pas une de ses propres pièces")
+        }
+
+        var newBoard = board.set(target.r, target.c, null)
+        newBoard = Rules.autoPromoteLast(newBoard)
+        game.board = serializeBoard(newBoard)
+
+        val outcome = Rules.computeOutcome(newBoard, claimerColor.opponent())
+        if (outcome != null) {
+            handleEnd(game, outcome)
+        }
+
+        games.save(game)
+        return toDto(game)
+    }
+
+    /**
+     * Met fin à la partie pour cause de timeout : le joueur dont c'est le tour perd.
+     * Idempotent : si la partie n'est plus active, renvoie simplement l'état courant.
+     */
+    @Transactional
+    fun timeoutCurrentTurn(gameId: UUID): GameStateDto {
+        val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
+        if (game.status != GameStatus.IN_PROGRESS.name) return toDto(game)
+
+        val loserColor = Color.valueOf(game.turn)
+        val winnerColor = loserColor.opponent()
+        game.winner = winnerColor.name
+        game.endReason = EndReason.TIMEOUT.name
+        game.status = GameStatus.FINISHED.name
+        game.finishedAt = Instant.now()
+        applyEloUpdate(game)
+        games.save(game)
+        return toDto(game)
+    }
+
+    /** Termine la partie en nulle mutuelle (les deux joueurs sont d'accord). */
+    @Transactional
+    fun acceptDraw(gameId: UUID): GameStateDto {
+        val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
+        if (game.status != GameStatus.IN_PROGRESS.name) return toDto(game)
+        game.winner = null
+        game.endReason = EndReason.DRAW_AGREED.name
+        game.status = GameStatus.FINISHED.name
+        game.finishedAt = Instant.now()
+        applyEloUpdate(game)
         games.save(game)
         return toDto(game)
     }
@@ -122,6 +191,15 @@ class GameService(
         val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
         return game.playerXId to game.playerOId
     }
+
+    /** Renvoie l'éventuelle partie active du joueur (pour reprise après reconnexion). */
+    fun findActiveGameOf(userId: UUID): ActiveGameView? {
+        val game = games.findActiveByUser(userId).firstOrNull() ?: return null
+        val color = colorOf(game, userId) ?: return null
+        return ActiveGameView(state = toDto(game), yourColor = color)
+    }
+
+    data class ActiveGameView(val state: GameStateDto, val yourColor: Color)
 
     // ─── Privé ────────────────────────────────────────────────────────────────
 

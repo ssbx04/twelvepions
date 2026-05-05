@@ -10,7 +10,7 @@ import java.util.UUID
 
 enum class GameStatus { IN_PROGRESS, FINISHED }
 
-enum class EndReason { CAPTURE_ALL, BLOCKED, ONE_VS_ONE, RESIGN }
+enum class EndReason { CAPTURE_ALL, BLOCKED, ONE_VS_ONE, RESIGN, TIMEOUT, DRAW_AGREED }
 
 @Entity
 @Table(name = "games")

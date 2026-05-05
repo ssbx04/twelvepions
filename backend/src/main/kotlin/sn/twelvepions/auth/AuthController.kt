@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController
 import sn.twelvepions.auth.dto.AuthResponse
 import sn.twelvepions.auth.dto.CompleteProfileRequest
 import sn.twelvepions.auth.dto.PhoneRequest
+import sn.twelvepions.auth.dto.PhoneResponse
 import sn.twelvepions.auth.dto.UsernameAvailableResponse
 import sn.twelvepions.auth.dto.VerifyOtpRequest
 import java.util.UUID
@@ -25,9 +26,9 @@ class AuthController(
     private val authService: AuthService,
 ) {
     @PostMapping("/phone")
-    fun sendOtp(@Valid @RequestBody req: PhoneRequest): ResponseEntity<Void> {
-        authService.sendOtp(req.phone)
-        return ResponseEntity.ok().build()
+    fun sendOtp(@Valid @RequestBody req: PhoneRequest): PhoneResponse {
+        val devOtp = authService.sendOtp(req.phone)
+        return PhoneResponse(devOtp = devOtp)
     }
 
     @PostMapping("/verify-otp")

@@ -14,8 +14,8 @@ class AuthService(
     private val otp: OtpService,
     private val jwt: JwtService,
 ) {
-    fun sendOtp(phone: String) {
-        otp.sendOtp(phone)
+    fun sendOtp(phone: String): String {
+        return otp.sendOtp(phone)
     }
 
     @Transactional

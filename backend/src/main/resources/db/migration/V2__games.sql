@@ -6,11 +6,11 @@ CREATE TABLE games (
     player_o_id          UUID         NOT NULL REFERENCES users(id),
 
     status               VARCHAR(20)  NOT NULL,                       -- IN_PROGRESS, FINISHED
-    turn                 CHAR(1)      NOT NULL DEFAULT 'X',           -- X | O
+    turn                 VARCHAR(1)      NOT NULL DEFAULT 'X',           -- X | O
     board                TEXT         NOT NULL,                       -- 5 lignes \n-séparées
     must_continue_from   VARCHAR(5),                                  -- "r,c" ou NULL
 
-    winner               CHAR(1),                                     -- X | O | NULL (draw / en cours)
+    winner               VARCHAR(1),                                     -- X | O | NULL (draw / en cours)
     end_reason           VARCHAR(20),                                 -- CAPTURE_ALL, BLOCKED, ONE_VS_ONE, RESIGN
 
     player_x_elo_before  INTEGER      NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE game_moves (
     id             BIGSERIAL    PRIMARY KEY,
     game_id        UUID         NOT NULL REFERENCES games(id) ON DELETE CASCADE,
     ply            INTEGER      NOT NULL,
-    player         CHAR(1)      NOT NULL,                              -- X | O
+    player         VARCHAR(1)      NOT NULL,                              -- X | O
     sequence_json  TEXT         NOT NULL,                              -- JSON de la séquence (chaîne de Move)
     played_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     UNIQUE (game_id, ply)

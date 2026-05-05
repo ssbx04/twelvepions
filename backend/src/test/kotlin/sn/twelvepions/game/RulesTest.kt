@@ -487,6 +487,145 @@ class RulesTest {
         assertEquals(Position(3, 2), seq[1].captured)
     }
 
+    // ─── Surplace (OOPS) ──────────────────────────────────────────────────────
+
+    @Test
+    fun `enumerateCaptureTurns is empty when no capture available`() {
+        val b = Board.parse(
+            listOf(
+                ".....",
+                ".....",
+                "..X..",
+                ".....",
+                ".....",
+            )
+        )
+        assertTrue(Rules.enumerateCaptureTurns(b, Color.X).isEmpty())
+    }
+
+    @Test
+    fun `enumerateAllLegalTurns includes simple moves even when capture available`() {
+        // X en (2,2) peut capturer O en (3,2) → atterrit (4,2). Mais on doit aussi
+        // pouvoir jouer les coups simples (côtés).
+        val b = Board.parse(
+            listOf(
+                ".....",
+                ".....",
+                "..X..",
+                "..O..",
+                ".....",
+            )
+        )
+        val all = Rules.enumerateAllLegalTurns(b, Color.X)
+        // 1 capture + 2 coups simples (gauche, droite) — l'avant est bloqué par O.
+        assertEquals(3, all.size)
+        assertTrue(all.any { it.sequence[0].captured != null }, "doit contenir la capture")
+        assertTrue(all.count { it.sequence[0].captured == null } == 2, "doit contenir les 2 simples")
+    }
+
+    @Test
+    fun `enumerateAllLegalTurns includes partial capture chains`() {
+        // X peut faire une chaîne de 2 captures via (0,2)→(2,2)→(4,2).
+        // On doit aussi pouvoir s'arrêter en (2,2) (Coudou interrompu).
+        val b = Board.parse(
+            listOf(
+                "..X..",
+                "..O..",
+                ".....",
+                "..O..",
+                ".....",
+            )
+        )
+        val all = Rules.enumerateAllLegalTurns(b, Color.X)
+        val partial = all.firstOrNull { it.sequence.size == 1 && it.sequence[0].captured == Position(1, 2) }
+        assertNotNull(partial, "le préfixe à 1 capture doit être autorisé")
+        val full = all.firstOrNull { it.sequence.size == 2 }
+        assertNotNull(full, "la chaîne complète doit être autorisée")
+    }
+
+    @Test
+    fun `faultyPositions empty when no capture was available`() {
+        val b = Board.parse(
+            listOf(
+                ".....",
+                ".....",
+                "..X..",
+                ".....",
+                ".....",
+            )
+        )
+        val played = Turn(listOf(Move(Position(2, 2), Position(3, 2))))
+        assertTrue(Rules.faultyPositions(b, Color.X, played).isEmpty())
+    }
+
+    @Test
+    fun `faultyPositions empty when player took a complete capture turn`() {
+        val b = Board.parse(
+            listOf(
+                ".....",
+                ".....",
+                "..X..",
+                "..O..",
+                ".....",
+            )
+        )
+        val played = Turn(listOf(Move(Position(2, 2), Position(4, 2), captured = Position(3, 2))))
+        assertTrue(Rules.faultyPositions(b, Color.X, played).isEmpty())
+    }
+
+    @Test
+    fun `faultyPositions returns destination of moved pion when only one could capture`() {
+        // Seul X en (2,2) peut capturer. Si X joue un coup simple à (2,1), il est
+        // fautif et sa position courante est (2,1).
+        val b = Board.parse(
+            listOf(
+                ".....",
+                ".....",
+                "..X..",
+                "..O..",
+                ".....",
+            )
+        )
+        val played = Turn(listOf(Move(Position(2, 2), Position(2, 1))))
+        val faulty = Rules.faultyPositions(b, Color.X, played)
+        assertEquals(setOf(Position(2, 1)), faulty)
+    }
+
+    @Test
+    fun `faultyPositions returns all candidates when a different pion played`() {
+        // Deux X peuvent capturer (2,2) et (2,4) via O en (3,2) et (3,4).
+        // Un 3e X en (0,0) joue un coup simple : les 2 fautifs restent à leur place.
+        val b = Board.parse(
+            listOf(
+                "X....",
+                ".....",
+                "..X.X",
+                "..O.O",
+                ".....",
+            )
+        )
+        val played = Turn(listOf(Move(Position(0, 0), Position(1, 0))))
+        val faulty = Rules.faultyPositions(b, Color.X, played)
+        assertEquals(setOf(Position(2, 2), Position(2, 4)), faulty)
+    }
+
+    @Test
+    fun `faultyPositions on partial capture chain returns intermediate position`() {
+        // Chaîne complète (0,2)→(2,2)→(4,2). Joueur s'arrête en (2,2).
+        val b = Board.parse(
+            listOf(
+                "..X..",
+                "..O..",
+                ".....",
+                "..O..",
+                ".....",
+            )
+        )
+        val played = Turn(listOf(Move(Position(0, 2), Position(2, 2), captured = Position(1, 2))))
+        val faulty = Rules.faultyPositions(b, Color.X, played)
+        assertEquals(setOf(Position(2, 2)), faulty)
+    }
+
     // ─── Match nul 1v1 ────────────────────────────────────────────────────────
 
     @Test

@@ -30,7 +30,7 @@ class OtpService(
     private val maxAttempts = 3
     private val maxPerHour = 5
 
-    fun sendOtp(phone: String) {
+    fun sendOtp(phone: String): String {
         val cooldownKey = cooldownKey(phone)
         if (redis.hasKey(cooldownKey)) throw OtpCooldownException()
 
@@ -51,6 +51,8 @@ class OtpService(
         log.info("│  📱  OTP pour {}  →  {}      │", phone, code)
         log.info("│      valide 5 min, 3 essais max          │")
         log.info("└──────────────────────────────────────────┘")
+
+        return code
     }
 
     fun verifyOtp(phone: String, code: String) {
