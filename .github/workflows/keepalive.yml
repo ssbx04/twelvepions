@@ -1,0 +1,13 @@
+name: Keep-alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          curl -sf "https://twelvepions.fly.dev/health" && echo "OK" || echo "Backend sleeping, wake-up triggered"
