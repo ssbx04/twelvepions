@@ -23,7 +23,8 @@ class FcmService(private val users: UserRepository) {
         enabled = if (!raw.isNullOrBlank()) {
             runCatching {
                 // Accepte JSON brut ou JSON encodé en base64.
-                val json = runCatching { Base64.getDecoder().decode(raw).toString(Charsets.UTF_8) }
+                // getMimeDecoder tolère les sauts de ligne dans la valeur base64.
+                val json = runCatching { Base64.getMimeDecoder().decode(raw).toString(Charsets.UTF_8) }
                     .getOrDefault(raw)
                 val credentials = GoogleCredentials.fromStream(json.byteInputStream())
                 val options = FirebaseOptions.builder().setCredentials(credentials).build()
