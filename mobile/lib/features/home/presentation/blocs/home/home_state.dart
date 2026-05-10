@@ -13,11 +13,12 @@ class HomeLoading extends HomeState {
 
 class HomeLoaded extends HomeState {
   final User user;
+  final List<GameSummary> recentGames;
 
-  const HomeLoaded(this.user);
+  const HomeLoaded(this.user, {this.recentGames = const []});
 
   @override
-  List<Object> get props => [user];
+  List<Object> get props => [user, recentGames];
 }
 
 class HomeError extends HomeState {

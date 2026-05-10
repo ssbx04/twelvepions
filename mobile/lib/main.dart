@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'app.dart';
 import 'core/di/service_locator.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/sound_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ Future<void> main() async {
 
   await setupServiceLocator();
   await NotificationService().init();
+  await SoundService.instance.init();
 
   runApp(const TwelvePionsApp());
 }

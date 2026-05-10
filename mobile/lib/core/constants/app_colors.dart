@@ -29,4 +29,11 @@ class AppColors {
 
   /// Bordure subtile pour les inputs et cartes.
   static Color borderSubtle = white.withValues(alpha: 0.12);
+
+  // ─── Game Board ────────────────────────────────────────────────────────────
+  
+  static const Color boardBorder = Color(0xFFE4BD8F);
+  static const Color boardRedCell = Color(0xFFDF9595);
+  static const Color boardYellowCell = Color(0xFFE4BD8F);
+  static const Color boardGreenCell = Color(0xFF9DCDA5);
 }

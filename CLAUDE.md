@@ -73,18 +73,21 @@ récupérer des assets (sons, etc.).
 │       │   │                          # acceptDraw, timeoutCurrentTurn, applyOopsRemoval,
 │       │   │                          # findActiveGameOf
 │       │   └── MatchmakingService     # queue Redis FIFO + lock JVM
+│       ├── friends/                   # Friendship (JPA), FriendshipRepository, FriendshipService,
+│       │                              # FriendshipController, FriendshipDtos
 │       ├── ws/                        # WsConfig, JwtHandshakeInterceptor, SessionRegistry,
 │       │                              # GameWebSocketHandler, TurnTimer, ReconnectGuard,
-│       │                              # DrawOfferRegistry, OopsRegistry
+│       │                              # DrawOfferRegistry, OopsRegistry, ChallengeRegistry
 │       └── config/OpenApiConfig.kt    # Swagger /swagger-ui
 │
 ├── mobile/                  # Flutter (Android/iOS)
 │   ├── pubspec.yaml         # bloc, get_it, dio, dartz, go_router, flutter_svg, etc.
 │   ├── run.sh               # détecte IP locale, lance flutter avec --dart-define=API_URL
 │   ├── assets/
-│   │   ├── icons/           # @.png, fullname.png, success.png, final_check.png
+│   │   ├── icons/           # @.png, fullname.png, success.png, final_check.png,
+│   │   │                    # pion_vert.png, pion_vert_dame.png, pion_rouge.png, pion_rouge_dame.png
 │   │   ├── images/          # pion_green.png, pion_rouge.png
-│   │   └── logos/           # logo.svg ("12 PIONS" multicolore)
+│   │   └── logos/           # logo.svg ("12 PIONS" multicolore), mariama.svg
 │   └── lib/
 │       ├── main.dart
 │       ├── app.dart
@@ -93,30 +96,58 @@ récupérer des assets (sons, etc.).
 │       │   ├── di/          # service_locator.dart (GetIt)
 │       │   ├── errors/      # failures.dart, exceptions.dart
 │       │   ├── network/     # (vide pour l'instant)
-│       │   ├── router/      # app_router.dart (go_router)
+│       │   ├── router/      # app_router.dart (go_router) — routes: /, /phone, /otp,
+│       │   │                # /complete-profile, /home, /matchmaking, /local-game, /game/:gameId
+│       │   ├── services/    # websocket_service.dart
 │       │   ├── storage/     # auth_local_storage.dart (FlutterSecureStorage)
 │       │   ├── theme/       # app_theme.dart
-│       │   └── widgets/     # AppBackground, BlurEllipse, PrimaryButton
+│       │   └── widgets/     # AppBackground, BlurEllipse, PrimaryButton, GlobalWsListener
 │       └── features/
 │           ├── splash/      # SplashPage avec bootstrap session
-│           └── auth/
-│               ├── data/    # UserModel, AuthSessionModel, RemoteDataSource, RepositoryImpl
-│               ├── domain/  # entités, repository abstract, 4 use cases
+│           ├── auth/
+│           │   ├── data/    # UserModel, AuthSessionModel, RemoteDataSource, RepositoryImpl
+│           │   ├── domain/  # entités, repository abstract, 4 use cases
+│           │   └── presentation/
+│           │       ├── blocs/{phone,otp,complete_profile}/
+│           │       ├── pages/{splash,phone,otp,complete_profile}_page.dart
+│           │       └── widgets/...
+│           ├── friends/
+│           │   ├── data/
+│           │   │   ├── datasources/    # friends_remote_datasource.dart (6 appels HTTP)
+│           │   │   └── models/         # friend_models.dart (FriendModel, FriendRequestModel, UserSearchResultModel)
+│           │   ├── domain/
+│           │   │   └── entities/       # friend.dart (Friend, FriendRequest, UserSearchResult, enum Presence)
+│           │   └── presentation/
+│           │       ├── blocs/          # FriendsBloc, FriendsState, FriendsEvent
+│           │       └── widgets/        # friends_tab_view.dart
+│           ├── home/
+│           │   └── presentation/
+│           │       ├── blocs/home/     # HomeBloc, HomeState, HomeEvent
+│           │       ├── pages/          # home_page.dart
+│           │       └── widgets/        # home_lobby_view.dart (cartes Jouer, Mariama, 2 Joueurs + amis en ligne)
+│           ├── play/
+│           │   └── presentation/
+│           │       ├── blocs/matchmaking/  # MatchmakingBloc
+│           │       └── pages/             # matchmaking_page.dart (recherche adversaire)
+│           └── game/
+│               ├── domain/             # game_rules.dart (GameRules : moves, captures, promotion)
 │               └── presentation/
-│                   ├── blocs/{phone,otp,complete_profile}/
-│                   ├── pages/{splash,phone,otp,complete_profile}_page.dart
-│                   └── widgets/{phone_input,otp_input,labeled_text_field,
-│                                level_selector,avatar_initials}.dart
+│                   ├── blocs/
+│                   │   ├── game/       # GameBloc (online via WS), GameState, GameEvent
+│                   │   └── local_game/ # LocalGameBloc (2 joueurs local, sans serveur)
+│                   ├── pages/
+│                   │   ├── game_page.dart       # Partie online (vs IA ou joueur)
+│                   │   └── local_game_page.dart # Partie locale 2 joueurs
+│                   └── widgets/
+│                       ├── game_board_widget.dart # Plateau 5x5 avec animations (StatefulWidget)
+│                       ├── pion_widget.dart       # Rendu d'un pion (PNG asset)
+│                       └── turn_timer_widget.dart  # Timer circulaire 30s
 │
 ├── web/                     # SvelteKit (skeleton, à implémenter plus tard)
 ├── shared/                  # Spec canonique des règles + corpus de tests partagé
 │   ├── rules-spec.md
 │   └── test-corpus.json
 ├── screens/                 # Designs Figma exportés (PNG/JPG)
-│   ├── SplashScreen.jpg
-│   ├── GetOtpByPhoneScreen.jpg
-│   ├── VerifyNumberScreen.jpg
-│   └── CompleteProfile.jpg
 ├── docs/screens.md          # Liste des 22 écrans MVP + décisions UX
 ├── docker-compose.yml       # Postgres :5435 + Redis :6379
 ├── run.sh                   # lance docker compose + backend + web SvelteKit
@@ -135,8 +166,14 @@ récupérer des assets (sons, etc.).
 | **4.5** | Timer 30s/tour, reconnexion WS (avec suspend du timer), draw offer (3 refus = forfait), surplace OOPS | ✅ (51 tests, à commit) |
 | **Mobile auth** | Flutter Clean Architecture, splash + phone + OTP + complete profile branchés au backend | ✅ Validé end-to-end sur device |
 | **Mobile /home** | Page d'accueil/lobby avec données réelles, bouton de déconnexion et OTP Push Local | ✅ Terminé |
+| **Mobile /game** | Matchmaking UI, Plateau de jeu 5x5, animations fluides (AnimatedPositioned), timers | ✅ Terminé |
+| **IA Online** | Intégration de Mariama au WebSocket (queue.join.ai) pour tester le multijoueur seul | ✅ Terminé |
+| **Gameplay complet** | Surplace, coudou animé étape par étape, match nul, timer fin de partie, mode local 2 joueurs | ✅ Terminé |
+| **Polissage UI/UX** | Alignement local/online, timer coudou 3s systématique (anti-leak), démo animée Surplace, compteur de pions, bannières | ✅ Terminé |
+| **Onglet Amis** | Système d'amis complet : liste + présence realtime, défis directs via WS, recherche, demandes d'amis | ✅ Terminé |
 | **Web SvelteKit** | Reprendre le frontend web | ⏭ Plus tard |
-| **F** | Tournois, leaderboard, friends, etc. | ⏭ V2 |
+| **FCM** | Firebase Cloud Messaging pour notifications push hors-app | ⏸ Prochaine session |
+| **F** | Tournois, leaderboard, historique des parties | ⏭ V2 |
 
 ## État courant détaillé (mobile auth)
 
@@ -212,22 +249,32 @@ récupérer des assets (sons, etc.).
 
 ### Authentifié (Bearer JWT)
 
-| Méthode | Path | Body | Résultat |
+| Méthode | Path | Body / Params | Résultat |
 |---|---|---|---|
 | GET  | `/me` | — | `UserDto` |
 | POST | `/auth/complete-profile` | `{fullName, username, level}` | `{token, profileComplete, user}` |
+| GET  | `/friends` | — | `[FriendDto]` |
+| GET  | `/friends/requests` | — | `[FriendRequestDto]` |
+| POST | `/friends/request?targetId=` | — | `200` |
+| POST | `/friends/accept?requestId=` | — | `200` |
+| DELETE | `/friends?targetId=` | — | `200` |
+| GET  | `/users/search?q=` | — | `[UserSearchResultDto]` |
 | WS   | `/ws?token=<jwt>` | (handshake JWT par query) | bidirectionnel |
 
 ### Protocole WebSocket
 
 ```
 client → server :  queue.join | queue.leave | game.move | game.resign | ping
+                   game.draw.offer | game.draw.respond | game.oops.claim
+                   game.challenge.send { targetId } | game.challenge.respond { challengeId, accept }
 server → client :  connected | queue.queued | queue.left | game.matched
                    | game.resume | game.update | game.ended
                    | game.draw.offered | game.draw.declined
                    | opponent.disconnected | opponent.reconnected
                    | error | pong
-client → server :  + game.draw.offer | game.draw.respond | game.oops.claim
+                   | friend.request.received | friend.request.accepted | friend.presence.changed
+                   | game.challenge.received | game.challenge.sent
+                   | game.challenge.declined | game.challenge.expired | game.challenge.cancelled
 ```
 
 ### Règles temps & gestion partie (Phase 4.5)
@@ -329,6 +376,31 @@ client → server :  + game.draw.offer | game.draw.respond | game.oops.claim
   En dev, **imprimé dans le terminal backend** dans une boîte ASCII.
 - **JWT** : 7 jours, claims `sub` (UUID user) + `profileComplete`.
 - **Niveaux et seed ELO** : Débutant=1000, Intermédiaire=1200, Avancé=1400, Expert=1600.
+
+### Système d'amis & défis directs
+
+- **Modèle `friendships`** : bidirectionnel (requester_id, addressee_id, status VARCHAR(10)).
+  Contrainte UNIQUE sur (min(a,b), max(a,b)) logiquement (impliquée par UNIQUE sur la paire directe).
+  `findAcceptedFriendsOf(userId)` cherche `requester_id = userId OR addressee_id = userId`.
+- **Présence** calculée à la volée dans `getFriends()` :
+  1. `gameService.findActiveGameOf(friend.id) != null` → `IN_GAME`
+  2. `sessionRegistry.get(friend.id) != null` → `ONLINE`
+  3. sinon → `OFFLINE`
+- **`ChallengeRegistry`** : `ConcurrentHashMap<UUID, Challenge>` + `ScheduledExecutorService`.
+  À la création, un `schedule(30s)` auto-expire et envoie `game.challenge.expired` aux deux.
+  `consume()` annule le timer. `cancelByChallenger()` utilisé à la déconnexion.
+- **`GlobalWsListener`** : `StatefulWidget` enveloppant le child du `MaterialApp.router`.
+  Subscribe à `sl<WebSocketService>().messages` dans `initState()`. Pour montrer un dialog
+  ou un SnackBar, utilise toujours `rootNavigatorKey.currentContext` (le `context` local
+  n'est pas encore monté dans le Navigator de l'app).
+- **`FriendsBloc` partagé** : élevé au niveau de la route `/home` via `MultiBlocProvider`.
+  Ainsi `home_lobby_view.dart` (section amis en ligne) et `friends_tab_view.dart` (onglet Amis)
+  lisent le même state BLoC sans faire deux appels HTTP.
+- **`enum Presence { online, inGame, offline }`** côté Dart, string `'ONLINE'|'IN_GAME'|'OFFLINE'`
+  côté JSON.
+- **`UserSearchResultDto.friendshipStatus`** : `null` (aucune relation), `'PENDING_SENT'`,
+  `'PENDING_RECEIVED'`, `'ACCEPTED'`. Côté mobile, le bouton de la `_SearchResultTile`
+  change en fonction du statut.
 
 ## Pour lancer le dev en local
 
@@ -440,33 +512,88 @@ Les 22 écrans complets (MVP + V2) sont catalogués dans `~/12pions/docs/screens
   (`tools.jackson...`) et les API qui ont bougé.
 - **Connexion ADB wireless** : si elle se perd, refaire `adb connect IP:5555`,
   puis relancer le `flutter run` (pas besoin de relancer `run.sh` du backend).
+- **`GlobalWsListener` est au-dessus du Navigator** (placé dans `MaterialApp.router`
+  builder). Pour afficher des dialogs ou SnackBars depuis ce widget, il faut
+  obligatoirement passer par `rootNavigatorKey.currentContext` (jamais `context` local).
+  Le `rootNavigatorKey` est partagé entre `GoRouter` et `GlobalWsListener`.
+- **`FriendsBloc` élevé au niveau du routeur** : instancié dans le `MultiBlocProvider`
+  de la route `/home` (pas dans `home_page.dart`) pour être partagé entre la page lobby
+  et l'onglet Amis. Si on le crée dans la page, il est détruit à chaque changement d'onglet.
+- **`ChallengeRegistry` est in-memory** : les défis sont perdus au redémarrage backend.
+  OK pour le MVP, à revoir en multi-instance.
+- **`game.challenge.send` vs matchmaking** : la différence est que le défi crée une
+  partie directe entre deux joueurs sans passer par la queue Redis. `GameService.createGame()`
+  est appelé directement depuis `handleChallengeRespond` dans `GameWebSocketHandler`.
+- **`pushPresence()` dans le handler WS** : à chaque connexion/déconnexion, on requête
+  la DB pour trouver les amis acceptés et on envoie `friend.presence.changed` à chaque
+  ami online. Coût DB acceptable pour le MVP (O(n) amis par connexion).
 
 ## Prochaines étapes précises
 
-### Immédiat — page `/home` (lobby)
+### Phase actuelle — Gameplay complet & Polissage UI/UX ✅
 
-Actuellement `/home` est en cours d'implémentation.
-Il faut :
+Tout le gameplay mobile est fonctionnel et synchronisé entre local et online :
+- **Mouvements** : sélection par clic → destinations possibles (points noirs) → clic pour jouer
+- **Captures** : le clic sur un pion le sélectionne, les captures sont affichées mais **non obligatoires** (règle sénégalaise)
+- **Coudou** (chaîne de captures) : forcé localement, animé étape par étape pour l'IA (600ms entre chaque capture). Un timer de 3s est systématiquement affiché après chaque capture (même s'il n'y a pas de suite possible) pour masquer les intentions au joueur adverse.
+- **Surplace (OOPS)** : le joueur doit **deviner** tout seul s'il y a un surplace (pas d'indice visuel), cliquer Surplace puis sélectionner le pion fautif. Le serveur/local valide. Si vrai → animation de **démo visuelle** montrant le coup manqué, apparition d'une **bannière OOPS** avec son, puis le pion est retiré du plateau. Si faux → annulé silencieusement.
+- **Promotion** : pion → dame en arrivant rangée adverse, auto-promotion si dernier pion
+- **Match nul** : automatique en 1v1 (sauf si surplace réclamable), draw offer avec 3 refus = forfait
+- **Timer 30s/tour** : client + serveur, arrêt à la fin de partie.
+- **UI & Layout** : Header global centré avec durée du match et bouton mute. Barre de pions à côté de l'échiquier montrant dynamiquement le nombre de pions restants (12) et l'opacité des pions capturés (cimetière).
+- **Mode local 2 joueurs** : purement client-side avec `LocalGameBloc`, timers, compteurs de pions et surplace alignés sur le comportement online.
+- **Animations & retours visuels** : `AnimatedPositioned` avec tracking par ID (500ms glissement), halo jaune sélection, intégration de bannières (OOPS, Coudou) et d'alertes sonores (`SoundService`).
 
-1. Créer le `Scaffold` avec la `BottomNavigationBar` (5 onglets : Accueil, Jouer, Amis, Profil, Réglages).
-2. Implémenter le contenu de l'onglet Accueil : 
-   - Bouton géant "JOUER MAINTENANT"
-   - Carte "Affronter Mariama"
-   - Historique "Dernière partie"
-   - Liste des amis en ligne
-3. Brancher un `HomeBloc` (ou utiliser `AuthBloc`) pour récupérer l'ELO du joueur via `GET /me`.
+### Détails techniques importants sur le gameplay
 
-### Phase 4.5 — fait
+- **GameBoardWidget** est un `StatefulWidget` avec `_PieceData` (id, type, r, c). Le `_syncBoard()` fait du matching
+  exact puis par couleur pour conserver les IDs stables entre mises à jour → les `AnimatedPositioned` glissent.
+- **Surplace aveugle** : le bouton Surplace n'a **aucun indice visuel** (pas de surbrillance rouge).
+  Tous les pions adverses sont cliquables en mode surplace. Le client envoie `game.oops.claim` au serveur
+  qui valide. En local, le `LocalGameBloc` vérifie les `oopsFaultyPositions` stockées dans le state.
+- **Board fixe en local** : `viewColor = 'O'` (orientation fixe, vert en haut, rouge en bas).
+  En online, `yourColor` est fixé par le serveur au `game.matched`.
+- **Coudou IA animé** : le `GameBloc._replaySequence()` rejoue chaque étape de `lastMove`
+  avec `Future.delayed(600ms)` entre chaque, puis émet le state final du serveur.
 
-Tous les chantiers livrés (51 tests verts) :
-- **Timer 30s/tour** serveur (`TurnTimer`, `EndReason.TIMEOUT`)
-- **Reconnexion WS** (`ReconnectGuard`, suspend/resume du `TurnTimer`)
-- **Draw offer** (`DrawOfferRegistry`, 3 refus = forfait, `EndReason.DRAW_AGREED`)
-- **Surplace OOPS online** (`OopsRegistry`, `Rules.faultyPositions`,
-  `Rules.enumerateAllLegalTurns`, `GameService.applyOopsRemoval`)
+### À venir
 
-À reprendre plus tard pour scale : remplacer les composants in-memory
-par du Redis pub/sub multi-instance (timer, reconnect, draw, oops).
+1. **Historique des parties** (✅ Terminé)
+   - Backend : `GET /me/games?limit=3` implémenté.
+   - Mobile : Integration complète avec nouveau design de carte (badge glowing).
+
+2. **Robustesse multijoueur** (✅ Terminé)
+   - Vérifier le flow complet `game.matched` → crash app → `game.resume` sur reconnexion
+   - S'assurer que l'abandon auto 30s (`ReconnectGuard`) se comporte bien côté mobile
+   - Tester matchmaking avec 2 devices réels
+
+3. **Polish UX** (✅ Terminé)
+   - Transitions de page fluides lobby↔matchmaking
+   - Micro-animations supplémentaires
+   - Tutoriel première partie
+
+4. **Onglet Profil** (✅ Terminé)
+   - Affichage complet des stats (ELO, Rang, Ratio V/D)
+   - Historique complet des parties (pagination ou limit=15)
+   - Bouton de déconnexion fonctionnel
+
+5. **Onglet Amis** (✅ Terminé)
+   - DB : table `friendships` (V3__friendships.sql), modèle bidirectionnel PENDING → ACCEPTED
+   - Backend : `FriendshipService`, `FriendshipController`, `ChallengeRegistry` (30s auto-expire)
+   - Mobile : `FriendsBloc` (subscribe WS dans constructeur), `FriendsTabView` (2 tabs : Amis / Demandes + recherche)
+   - Fiche profil ami (bottom sheet) : Défier, Voir profil (stub), Supprimer
+   - Présence realtime : `friend.presence.changed` WS push à chaque connexion/déconnexion
+   - Défi direct : `game.challenge.send` → dialog 30s chez le destinataire → accepter → les deux naviguent vers la partie
+   - `GlobalWsListener` gère : `game.challenge.received`, `game.challenge.declined/expired`, `game.matched`, `friend.request.received/accepted`
+
+6. **Firebase Cloud Messaging** (Prochaine session)
+   - Notifications push hors-app pour : défis reçus, demandes d'amis, fin de partie
+   - Backend : token FCM stocké en DB, envoi depuis `FriendshipService` et `GameWebSocketHandler`
+   - Mobile : `firebase_messaging` plugin, demande de permission, gestion foreground/background
+
+7. **Onglet Réglages** (À faire)
+   - Toggle des sons et vibrations
+   - Choix de la langue (FR/EN)
 
 ### Encore plus tard — Web SvelteKit
 

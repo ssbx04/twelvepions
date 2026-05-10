@@ -7,6 +7,7 @@ class AuthLocalStorage {
   static const String _jwtKey = '12pions.jwt';
   static const String _userIdKey = '12pions.userId';
   static const String _profileCompleteKey = '12pions.profileComplete';
+  static const String _tutorialKey = '12pions.tutorial';
 
   final FlutterSecureStorage _storage;
 
@@ -31,11 +32,22 @@ class AuthLocalStorage {
         value: complete.toString(),
       );
 
+  Future<bool> readHasSeenTutorial() async {
+    final v = await _storage.read(key: _tutorialKey);
+    return v == 'true';
+  }
+
+  Future<void> writeHasSeenTutorial(bool seen) => _storage.write(
+        key: _tutorialKey,
+        value: seen.toString(),
+      );
+
   Future<void> clear() async {
     await Future.wait([
       _storage.delete(key: _jwtKey),
       _storage.delete(key: _userIdKey),
       _storage.delete(key: _profileCompleteKey),
+      // On garde _tutorialKey pour qu'il ne se réaffiche pas à chaque reconnexion
     ]);
   }
 }

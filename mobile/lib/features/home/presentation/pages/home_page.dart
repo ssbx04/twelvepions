@@ -4,7 +4,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/app_background.dart';
+import '../../../../core/storage/auth_local_storage.dart';
+import '../../../../core/di/service_locator.dart';
+import '../../../game/presentation/widgets/tutorial_overlay.dart';
 import '../widgets/home_lobby_view.dart';
+import '../../../play/presentation/widgets/play_tab_view.dart';
+import '../../../friends/presentation/widgets/friends_tab_view.dart';
+import '../../../profile/presentation/widgets/profile_tab_view.dart';
 import '../widgets/placeholders.dart';
 
 class HomePage extends StatefulWidget {
@@ -16,14 +22,39 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  bool _showTutorial = false;
 
   final List<Widget> _views = const [
     HomeLobbyView(),
-    PlayPlaceholderView(),
-    FriendsPlaceholderView(),
-    ProfilePlaceholderView(),
+    PlayTabView(),
+    FriendsTabView(),
+    ProfileTabView(),
     SettingsPlaceholderView(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkTutorial();
+  }
+
+  Future<void> _checkTutorial() async {
+    final storage = sl<AuthLocalStorage>();
+    final hasSeen = await storage.readHasSeenTutorial();
+    if (!hasSeen && mounted) {
+      setState(() {
+        _showTutorial = true;
+      });
+    }
+  }
+
+  void _dismissTutorial() async {
+    setState(() {
+      _showTutorial = false;
+    });
+    final storage = sl<AuthLocalStorage>();
+    await storage.writeHasSeenTutorial(true);
+  }
 
   void _onTabTapped(int index) {
     setState(() {
@@ -50,14 +81,20 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AppBackground(
-        // On peut ajuster l'emplacement des ellipses selon l'onglet
-        greenOffset: const Offset(160, -50),
-        redOffset: const Offset(-180, 500),
-        child: IndexedStack(
-          index: _currentIndex,
-          children: _views,
-        ),
+      body: Stack(
+        children: [
+          AppBackground(
+            // On peut ajuster l'emplacement des ellipses selon l'onglet
+            greenOffset: const Offset(160, -50),
+            redOffset: const Offset(-180, 500),
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _views,
+            ),
+          ),
+          if (_showTutorial)
+            TutorialOverlay(onDismiss: _dismissTutorial),
+        ],
       ),
       bottomNavigationBar: Theme(
         data: Theme.of(context).copyWith(

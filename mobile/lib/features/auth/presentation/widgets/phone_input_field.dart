@@ -46,7 +46,6 @@ class PhoneInputField extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // ─── Séparateur vertical ──────────────────────────────────────
           Container(
             width: 1,
             height: 28,

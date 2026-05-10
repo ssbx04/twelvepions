@@ -25,6 +25,14 @@ class ApiEndpoints {
   static const String authCheckUsername = '/auth/check-username';
 
   static const String me = '/me';
+  static const String meGames = '/me/games';
 
   static const String aiMove = '/ai/move';
+
+  static const String friends = '/friends';
+  static const String friendsRequests = '/friends/requests';
+  static const String friendsRequest = '/friends/request';
+  static const String friendsAccept = '/friends/accept';
+  static const String usersSearch = '/users/search';
 }
+

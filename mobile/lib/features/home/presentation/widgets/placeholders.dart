@@ -33,39 +33,6 @@ class FriendsPlaceholderView extends StatelessWidget {
   }
 }
 
-class ProfilePlaceholderView extends StatelessWidget {
-  const ProfilePlaceholderView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Profil - À venir',
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await sl<AuthRepository>().logout();
-              if (context.mounted) {
-                context.goNamed('phone');
-              }
-            },
-            icon: const Icon(Icons.logout, color: Colors.white),
-            label: const Text('Se déconnecter', style: TextStyle(color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class SettingsPlaceholderView extends StatelessWidget {
   const SettingsPlaceholderView({super.key});
