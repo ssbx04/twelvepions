@@ -58,4 +58,14 @@ class MatchmakingService(
             redis.opsForList().remove(queueKey, 0, userId.toString())
         }
     }
+
+    fun joinAiQueue(userId: UUID): MatchResult.Matched {
+        // Crée instantanément une partie contre Mariama
+        val mariamaId = UUID.fromString("00000000-0000-0000-0000-000000000000")
+        
+        // On tire au sort la couleur
+        val (xId, oId) = if (Math.random() < 0.5) userId to mariamaId else mariamaId to userId
+        val state = gameService.createGame(xId, oId)
+        return MatchResult.Matched(state, xId, oId)
+    }
 }

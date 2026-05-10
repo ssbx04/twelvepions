@@ -28,6 +28,16 @@ data class EloChangeDto(
     val o: Int,
 )
 
+data class GameSummaryDto(
+    val gameId: String,
+    val opponentUsername: String,
+    val opponentElo: Int,
+    val result: String, // WIN, LOSS, DRAW
+    val eloChange: Int,
+    val endReason: String,
+    val finishedAt: String,
+)
+
 /** Coup envoyé par un client. */
 data class MoveSequenceDto(
     val sequence: List<MoveDto>,

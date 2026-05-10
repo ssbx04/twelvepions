@@ -48,15 +48,8 @@ class GameService(
         return toDto(game)
     }
 
-    /** Résultat d'un coup. [faulty] non-vide ⇒ l'adversaire peut réclamer OOPS. */
     data class MoveOutcome(val state: GameStateDto, val faulty: Set<Position>)
 
-    /**
-     * Applique un tour (séquence de coups) joué par [userId] sur la partie [gameId].
-     * Autorise les coups simples ou chaînes incomplètes même si une capture
-     * était disponible (la sanction se fait via OOPS côté adversaire).
-     * Si la partie se termine, met à jour l'ELO et stocke la fin.
-     */
     @Transactional
     fun applyMove(gameId: UUID, userId: UUID, sequence: List<MoveDto>): MoveOutcome {
         val game = games.findById(gameId).orElseThrow { GameNotFoundException() }
@@ -74,7 +67,6 @@ class GameService(
 
         val faulty = Rules.faultyPositions(board, playerColor, turn)
 
-        // Applique tous les coups de la séquence + promotion solo en fin de tour.
         var newBoard = board
         for (m in turn.sequence) newBoard = Rules.applyMove(newBoard, m)
         newBoard = Rules.autoPromoteLast(newBoard)
@@ -93,7 +85,7 @@ class GameService(
         game.board = serializeBoard(newBoard)
         game.mustContinueFrom = null
 
-        val outcome = Rules.computeOutcome(newBoard, playerColor)
+        val outcome = Rules.computeOutcome(newBoard, playerColor, faulty.isNotEmpty())
         if (outcome != null) {
             handleEnd(game, outcome)
         } else {

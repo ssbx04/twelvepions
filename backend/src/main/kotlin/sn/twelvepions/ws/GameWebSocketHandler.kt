@@ -16,6 +16,11 @@ import sn.twelvepions.game.ai.dto.MoveDto
 import sn.twelvepions.game.ai.dto.PositionDto
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import sn.twelvepions.auth.AuthService
+import sn.twelvepions.friends.FriendshipRepository
+import sn.twelvepions.game.ai.Mariama
+import sn.twelvepions.game.ai.FindBestMoveOptions
+import kotlin.concurrent.thread
 import java.util.UUID
 
 /**
@@ -49,20 +54,23 @@ import java.util.UUID
 class GameWebSocketHandler(
     private val matchmaking: MatchmakingService,
     private val gameService: GameService,
+    private val authService: AuthService,
+    private val friendshipRepo: FriendshipRepository,
     private val registry: SessionRegistry,
     private val turnTimer: TurnTimer,
     private val reconnectGuard: ReconnectGuard,
     private val drawOffers: DrawOfferRegistry,
     private val oopsRegistry: OopsRegistry,
+    private val challenges: ChallengeRegistry,
     private val mapper: ObjectMapper,
 ) : TextWebSocketHandler() {
-
     private val log = LoggerFactory.getLogger(GameWebSocketHandler::class.java)
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         val userId = userIdOf(session) ?: return
         registry.register(userId, session)
         log.info("WS connected: user={} ({} online)", userId, registry.onlineCount)
+        pushPresence(userId, "ONLINE")
         sendJson(session, mapOf("type" to "connected", "userId" to userId.toString()))
 
         // Si une partie est en cours, renvoyer son état au joueur qui revient
@@ -101,9 +109,22 @@ class GameWebSocketHandler(
         val userId = userIdOf(session) ?: return
         registry.unregister(userId, session)
         runCatching { matchmaking.leaveQueue(userId) }
+        pushPresence(userId, "OFFLINE")
+        // Annuler les défis envoyés par ce joueur → notifier les cibles
+        challenges.cancelByChallenger(userId).forEach { (challengeId, targetId) ->
+            registry.send(targetId, mapper.writeValueAsString(
+                mapOf("type" to "game.challenge.cancelled", "challengeId" to challengeId.toString())
+            ))
+        }
+        // Annuler les défis reçus par ce joueur → notifier les challengers
+        challenges.cancelByTarget(userId).forEach { (challengeId, challengerId) ->
+            registry.send(challengerId, mapper.writeValueAsString(
+                mapOf("type" to "game.challenge.declined", "challengeId" to challengeId.toString())
+            ))
+        }
         log.info("WS closed: user={} status={} ({} online)", userId, status, registry.onlineCount)
 
-        // Si le joueur était dans une partie active, lui laisser une fenêtre de reconnexion.
+        // Si le joueur était dans une partie active, lui la isser une fenêtre de reconnexion.
         val active = runCatching { gameService.findActiveGameOf(userId) }.getOrNull() ?: return
         val gameId = UUID.fromString(active.state.gameId)
         val deadline = reconnectGuard.armDisconnect(userId, gameId)
@@ -130,12 +151,15 @@ class GameWebSocketHandler(
             val msg = mapper.readTree(message.payload)
             when (val type = msg["type"]?.asString()) {
                 "queue.join" -> handleQueueJoin(userId, session)
+                "queue.join.ai" -> handleQueueJoinAi(userId, session)
                 "queue.leave" -> handleQueueLeave(userId, session)
                 "game.move" -> handleMove(userId, msg)
                 "game.resign" -> handleResign(userId, msg)
                 "game.draw.offer" -> handleDrawOffer(userId, msg, session)
                 "game.draw.respond" -> handleDrawRespond(userId, msg, session)
-                "game.oops.claim" -> handleOopsClaim(userId, msg, session)
+                "game.oops.claim"       -> handleOopsClaim(userId, msg, session)
+                "game.challenge.send"   -> handleChallengeSend(userId, msg, session)
+                "game.challenge.respond"-> handleChallengeRespond(userId, msg, session)
                 "ping" -> sendJson(session, mapOf("type" to "pong"))
                 else -> sendError(session, "unknown_type", "Type inconnu : $type")
             }
@@ -173,6 +197,23 @@ class GameWebSocketHandler(
                 registry.send(r.playerOId, mapper.writeValueAsString(msgO))
             }
         }
+    }
+
+    private fun handleQueueJoinAi(userId: UUID, session: WebSocketSession) {
+        val r = matchmaking.joinAiQueue(userId)
+        val state = r.state
+        val gameId = UUID.fromString(state.gameId)
+        val deadline = turnTimer.arm(gameId)
+        
+        val msgUser = mapOf(
+            "type" to "game.matched",
+            "yourColor" to if (r.playerXId == userId) "X" else "O",
+            "state" to state,
+            "turnDeadlineEpochMs" to deadline,
+        )
+        registry.send(userId, mapper.writeValueAsString(msgUser))
+        
+        triggerAiIfNecessary(gameId)
     }
 
     private fun handleQueueLeave(userId: UUID, session: WebSocketSession) {
@@ -219,6 +260,10 @@ class GameWebSocketHandler(
             "oops" to oopsBlock,
         )
         registry.broadcast(listOf(xId, oId), mapper.writeValueAsString(update))
+        
+        if (!finished) {
+            triggerAiIfNecessary(gameId)
+        }
     }
 
     private fun handleOopsClaim(userId: UUID, msg: JsonNode, session: WebSocketSession) {
@@ -243,6 +288,10 @@ class GameWebSocketHandler(
             sendError(session, "invalid_target", "Cette pièce n'est pas fautive"); return
         }
 
+        doOopsClaim(userId, gameId, target)
+    }
+
+    private fun doOopsClaim(userId: UUID, gameId: UUID, target: Position) {
         val state = gameService.applyOopsRemoval(gameId, userId, target)
         oopsRegistry.clear(gameId)
 
@@ -256,6 +305,7 @@ class GameWebSocketHandler(
             turnTimer.arm(gameId)
         }
 
+        val (xId, oId) = gameService.playersOf(gameId)
         val payload = mapper.writeValueAsString(
             mapOf(
                 "type" to if (finished) "game.ended" else "game.update",
@@ -289,6 +339,20 @@ class GameWebSocketHandler(
             return
         }
         val opponentId = if (userId == xId) oId else xId
+        
+        // Si l'adversaire est l'IA, elle accepte la nulle
+        if (opponentId.toString() == "00000000-0000-0000-0000-000000000000") {
+            drawOffers.consumeAccept(gameId)
+            val state = gameService.acceptDraw(gameId)
+            turnTimer.cancel(gameId)
+            drawOffers.clearForGame(gameId)
+            val payload = mapper.writeValueAsString(
+                mapOf("type" to "game.ended", "state" to state),
+            )
+            registry.broadcast(listOf(xId, oId), payload)
+            return
+        }
+        
         registry.send(
             opponentId,
             mapper.writeValueAsString(
@@ -342,6 +406,150 @@ class GameWebSocketHandler(
             drawOffers.clearForGame(gameId)
             val ended = mapper.writeValueAsString(mapOf("type" to "game.ended", "state" to state))
             registry.broadcast(listOf(xId, oId), ended)
+        }
+    }
+
+    private fun handleChallengeSend(userId: UUID, msg: JsonNode, session: WebSocketSession) {
+        val targetId = runCatching { UUID.fromString(msg["targetId"].asString()) }.getOrNull()
+            ?: run { sendError(session, "bad_payload", "targetId manquant ou invalide"); return }
+
+        if (targetId == userId) { sendError(session, "bad_challenge", "Impossible de se défier soi-même"); return }
+        if (registry.get(targetId) == null) { sendError(session, "target_offline", "Ce joueur est hors ligne"); return }
+        if (gameService.findActiveGameOf(targetId) != null) { sendError(session, "target_in_game", "Ce joueur est déjà en partie"); return }
+        if (gameService.findActiveGameOf(userId) != null) { sendError(session, "already_in_game", "Tu es déjà en partie"); return }
+
+        val challenger = authService.getUser(userId)
+        val challengeId = UUID.randomUUID()
+
+        challenges.create(challengeId, userId, targetId) { expiredId ->
+            registry.send(userId, mapper.writeValueAsString(
+                mapOf("type" to "game.challenge.expired", "challengeId" to expiredId.toString())
+            ))
+            registry.send(targetId, mapper.writeValueAsString(
+                mapOf("type" to "game.challenge.cancelled", "challengeId" to expiredId.toString())
+            ))
+        }
+
+        registry.send(targetId, mapper.writeValueAsString(mapOf(
+            "type" to "game.challenge.received",
+            "challengeId" to challengeId.toString(),
+            "challengerId" to userId.toString(),
+            "challengerUsername" to (challenger.username ?: challenger.phone),
+            "challengerElo" to challenger.elo,
+        )))
+        sendJson(session, mapOf("type" to "game.challenge.sent", "challengeId" to challengeId.toString()))
+    }
+
+    private fun handleChallengeRespond(userId: UUID, msg: JsonNode, session: WebSocketSession) {
+        val challengeId = runCatching { UUID.fromString(msg["challengeId"].asString()) }.getOrNull()
+            ?: run { sendError(session, "bad_payload", "challengeId manquant"); return }
+        val accept = msg["accept"]?.asBoolean()
+            ?: run { sendError(session, "bad_payload", "accept manquant"); return }
+
+        val challenge = challenges.consume(challengeId)
+            ?: run { sendError(session, "challenge_expired", "Ce défi a expiré ou n'existe plus"); return }
+
+        if (challenge.targetId != userId) {
+            sendError(session, "not_your_challenge", "Ce défi ne vous est pas destiné"); return
+        }
+
+        if (!accept) {
+            registry.send(challenge.challengerId, mapper.writeValueAsString(
+                mapOf("type" to "game.challenge.declined", "challengeId" to challengeId.toString())
+            ))
+            return
+        }
+
+        // Accepté → créer la partie (challengerId = X, target = O)
+        val state = gameService.createGame(challenge.challengerId, userId)
+        val gameId = UUID.fromString(state.gameId)
+        val deadline = turnTimer.arm(gameId)
+        registry.send(challenge.challengerId, mapper.writeValueAsString(mapOf(
+            "type" to "game.matched", "yourColor" to "X", "state" to state, "turnDeadlineEpochMs" to deadline,
+        )))
+        registry.send(userId, mapper.writeValueAsString(mapOf(
+            "type" to "game.matched", "yourColor" to "O", "state" to state, "turnDeadlineEpochMs" to deadline,
+        )))
+    }
+
+    private fun pushPresence(userId: UUID, presence: String) {
+        val friendIds = runCatching {
+            friendshipRepo.findAcceptedFriendsOf(userId).map { f ->
+                if (f.requesterId == userId) f.addresseeId else f.requesterId
+            }
+        }.getOrDefault(emptyList())
+        val payload = mapper.writeValueAsString(mapOf(
+            "type" to "friend.presence.changed",
+            "userId" to userId.toString(),
+            "presence" to presence,
+        ))
+        friendIds.forEach { registry.send(it, payload) }
+    }
+
+    private fun triggerAiIfNecessary(gameId: UUID) {
+        val state = try {
+            gameService.getState(gameId)
+        } catch (e: Exception) {
+            return
+        }
+        
+        if (state.status != "IN_PROGRESS") return
+        
+        val isAiTurn = (state.turn == "X" && state.playerX.id == "00000000-0000-0000-0000-000000000000") || 
+                       (state.turn == "O" && state.playerO.id == "00000000-0000-0000-0000-000000000000")
+                       
+        if (!isAiTurn) return
+        
+        val aiId = UUID.fromString("00000000-0000-0000-0000-000000000000")
+        
+        thread(start = true) {
+            try {
+                // Petit délai pour faire plus "humain"
+                Thread.sleep(500)
+                
+                val color = sn.twelvepions.game.Color.valueOf(state.turn)
+                
+                // Mariama réclame le surplace si disponible
+                val pendingOops = oopsRegistry.get(gameId)
+                if (pendingOops != null && pendingOops.claimerColor == color) {
+                    val target = pendingOops.faultyPositions.first() // Prend la première pièce
+                    doOopsClaim(aiId, gameId, target)
+                    Thread.sleep(300) // Délai après oops avant de jouer
+                }
+                
+                // Récupération de l'état frais juste avant de jouer (après éventuel oops)
+                val freshState = gameService.getState(gameId)
+                if (freshState.status != "IN_PROGRESS" || freshState.turn != state.turn) return@thread
+                
+                val board = sn.twelvepions.game.Board.parse(freshState.board)
+                
+                // Profondeur = 4 (Niveau intermédiaire/difficile)
+                val result = Mariama.findBestMove(board, color, FindBestMoveOptions(maxDepth = 4))
+                
+                val sequence = result.turn?.sequence?.map { m: sn.twelvepions.game.Move ->
+                    sn.twelvepions.game.ai.dto.MoveDto(
+                        from = sn.twelvepions.game.ai.dto.PositionDto(m.from.r, m.from.c),
+                        to = sn.twelvepions.game.ai.dto.PositionDto(m.to.r, m.to.c),
+                        captured = m.captured?.let { sn.twelvepions.game.ai.dto.PositionDto(it.r, it.c) },
+                    )
+                } ?: emptyList()
+                
+                if (sequence.isNotEmpty()) {
+                    val msg = mapper.createObjectNode()
+                    msg.put("gameId", gameId.toString())
+                    msg.set("sequence", mapper.valueToTree(sequence))
+                    
+                    // On réutilise handleMove qui gère déjà le broadcast et les timers
+                    handleMove(aiId, msg)
+                } else {
+                    // L'IA n'a pas de coup valide -> elle abandonne ou passe
+                    val msgResign = mapper.createObjectNode()
+                    msgResign.put("gameId", gameId.toString())
+                    handleResign(aiId, msgResign)
+                }
+            } catch (e: Exception) {
+                log.error("Erreur IA sur partie \$gameId", e)
+            }
         }
     }
 

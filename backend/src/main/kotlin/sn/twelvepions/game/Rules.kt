@@ -145,19 +145,22 @@ object Rules {
      *
      * Ordre de vérification :
      * 1. Capture totale de l'adversaire → victoire de [justPlayed].
-     * 2. Match nul 1v1 → Draw.
-     * 3. Adversaire bloqué → victoire de [justPlayed] par blocage.
+     * 2. Adversaire bloqué (aucun coup possible) → victoire de [justPlayed].
+     * 3. 1v1 et l'adversaire ne peut PAS capturer → match nul.
+     *    (Si l'adversaire PEUT capturer en 1v1, le jeu continue pour qu'il gagne.)
      */
-    fun computeOutcome(board: Board, justPlayed: Color): Outcome? {
+    fun computeOutcome(board: Board, justPlayed: Color, hasFaulty: Boolean = false): Outcome? {
         val opponent = justPlayed.opponent()
         if (board.count(opponent) == 0) {
             return Outcome.Win(justPlayed, WinReason.CAPTURE_ALL)
         }
-        if (isOnePieceDraw(board)) {
-            return Outcome.Draw
-        }
         if (!hasAnyMove(board, opponent)) {
             return Outcome.Win(justPlayed, WinReason.BLOCKED)
+        }
+        // 1v1 : match nul seulement si l'adversaire n'a aucune capture possible
+        // ET qu'il n'y a pas de surplace réclamable.
+        if (isOnePieceDraw(board) && !hasAnyCapture(board, opponent) && !hasFaulty) {
+            return Outcome.Draw
         }
         return null
     }
