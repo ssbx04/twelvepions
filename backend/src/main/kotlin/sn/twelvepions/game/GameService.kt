@@ -221,6 +221,8 @@ class GameService(
     }
 
     private fun applyEloUpdate(game: GameEntity) {
+        val mariama = java.util.UUID(0, 0)
+        if (game.playerXId == mariama || game.playerOId == mariama) return
         val (deltaX, deltaO) = elo.applyResult(game.playerXId, game.playerOId, game.winner)
         game.eloChangeX = deltaX
         game.eloChangeO = deltaO
