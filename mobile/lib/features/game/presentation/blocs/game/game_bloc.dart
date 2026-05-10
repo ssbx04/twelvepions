@@ -85,6 +85,19 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         }
       }
 
+      // Extraire lastMove ici pour le réutiliser dans la démo OOPS
+      final lastMove = event.message['lastMove'] as List?;
+
+      // Position originale du pion fautif : stockée si oops + lastMove présents
+      Map<String, int>? oopsMovedFrom;
+      if (event.message['oops'] != null && lastMove != null && lastMove.isNotEmpty) {
+        final first = lastMove.first as Map<String, dynamic>;
+        final from = first['from'] as Map<String, dynamic>?;
+        if (from != null) {
+          oopsMovedFrom = {'r': (from['r'] as num).toInt(), 'c': (from['c'] as num).toInt()};
+        }
+      }
+
       // --- Gestion du surplace (OOPS) reçu du serveur ---
       final oopsRemoved = event.message['oopsRemoved'] as Map<String, dynamic>?;
       if (oopsRemoved != null && state is GameActive) {
@@ -92,18 +105,31 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         final removedR = (oopsRemoved['r'] as num).toInt();
         final removedC = (oopsRemoved['c'] as num).toInt();
 
-        // Calculer la capture manquée depuis l'ancien board
-        final missedCaptures = GameRules.captureMoves(currentState.board, removedR, removedC);
+        // Position originale du pion fautif (peut avoir bougé via coup simple)
+        final originalR = currentState.oopsMovedFrom?['r'] ?? removedR;
+        final originalC = currentState.oopsMovedFrom?['c'] ?? removedC;
+
+        // Reconstruire le board avant le coup fautif si le pion a bougé
+        List<String> boardForDemo = currentState.board;
+        if (originalR != removedR || originalC != removedC) {
+          final mutable = currentState.board.map((row) => row.split('')).toList();
+          final piece = mutable[removedR][removedC];
+          mutable[removedR][removedC] = '.';
+          mutable[originalR][originalC] = piece;
+          boardForDemo = mutable.map((row) => row.join('')).toList();
+        }
+
+        final missedCaptures = GameRules.captureMoves(boardForDemo, originalR, originalC);
         if (missedCaptures.isNotEmpty) {
           final demoMove = missedCaptures.first;
           final demoR = demoMove['r'] as int;
           final demoC = demoMove['c'] as int;
           final capturedPos = demoMove['captured'] as Map<String, int>?;
 
-          // Étape 1 : glisser le pion vers la destination de capture
-          var demoBoard = currentState.board.map((row) => row.split('')).toList();
-          final pieceChar = demoBoard[removedR][removedC];
-          demoBoard[removedR][removedC] = '.';
+          // Étape 1 : glisser le pion vers la destination de capture manquée
+          var demoBoard = boardForDemo.map((row) => row.split('')).toList();
+          final pieceChar = demoBoard[originalR][originalC];
+          demoBoard[originalR][originalC] = '.';
           demoBoard[demoR][demoC] = pieceChar;
           if (capturedPos != null) {
             demoBoard[capturedPos['r']!][capturedPos['c']!] = '.';
@@ -112,19 +138,17 @@ class GameBloc extends Bloc<GameEvent, GameState> {
             board: demoBoard.map((row) => row.join('')).toList(),
             surplaceMode: false,
           ));
-
           await Future.delayed(const Duration(milliseconds: 800));
 
-          // Étape 2 : remettre le pion à sa place (glisser retour)
+          // Étape 2 : remettre le board dans l'état après coup fautif (pion encore là)
           emit(currentState.copyWith(
             board: currentState.board,
             surplaceMode: false,
           ));
-
-          await Future.delayed(const Duration(milliseconds: 800));
+          await Future.delayed(const Duration(milliseconds: 600));
         }
 
-        // Étape 3 : appliquer le board final du serveur (pion retiré) + flag oops
+        // Étape 3 : board final (pion retiré) + flag oops
         emit(GameActive(
           gameId: gameId,
           yourColor: yourColor,
@@ -147,7 +171,6 @@ class GameBloc extends Bloc<GameEvent, GameState> {
 
       // Coudou animation : si l'adversaire/IA a joué une séquence multi-capture,
       // on rejoue chaque étape avec un délai pour que le pion "tue un à un".
-      final lastMove = event.message['lastMove'] as List?;
       final isOpponentMove = state is GameActive && (state as GameActive).yourColor != stateData['turn'];
       
       if (lastMove != null && lastMove.length > 1 && state is GameActive && !isOpponentMove) {
@@ -169,6 +192,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           playerO: stateData['playerO'] as Map<String, dynamic>,
           turnDeadlineEpochMs: event.message['turnDeadlineEpochMs'] as int?,
           oopsFaultyPositions: faultyPositions,
+          oopsMovedFrom: oopsMovedFrom,
           surplaceMode: false,
         ));
         return;
@@ -188,6 +212,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         playerO: stateData['playerO'] as Map<String, dynamic>,
         turnDeadlineEpochMs: event.message['turnDeadlineEpochMs'] as int?,
         oopsFaultyPositions: faultyPositions,
+        oopsMovedFrom: oopsMovedFrom,
         surplaceMode: false,
       ));
     } else if (type == 'opponent.disconnected') {

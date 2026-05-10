@@ -8,6 +8,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/bouncing_wrapper.dart';
 import '../../../../features/friends/domain/entities/friend.dart';
 import '../../../../features/friends/presentation/blocs/friends_bloc.dart';
+import '../../../../features/friends/presentation/widgets/friends_tab_view.dart';
 import '../../domain/entities/game_summary.dart';
 import '../blocs/home/home_bloc.dart';
 import 'game_history_card.dart';
@@ -43,8 +44,6 @@ class HomeLobbyView extends StatelessWidget {
                 _MariamaCard(),
                 const SizedBox(height: 24),
                 _buildOnlineFriends(),
-                const SizedBox(height: 16),
-                _buildLocalCard(context),
                 const SizedBox(height: 24),
                 _buildRecentGamesSection(recentGames),
                 const SizedBox(height: 32),
@@ -155,53 +154,6 @@ class HomeLobbyView extends StatelessWidget {
   }
 
 
-  // 4b. Local 2 Players Card
-  Widget _buildLocalCard(BuildContext context) {
-    return BouncingWrapper(
-      child: GestureDetector(
-        onTap: () async {
-          await context.pushNamed('local-game');
-          if (context.mounted) {
-            context.read<HomeBloc>().add(const HomeStarted());
-          }
-        },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1218),
-          border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: AppColors.red.withValues(alpha: 0.05), blurRadius: 15, spreadRadius: 2)],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.red.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.red.withValues(alpha: 0.5)),
-              ),
-              child: const Icon(Icons.people_rounded, color: AppColors.red, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('2 Joueurs', style: AppTextStyles.bodyLg.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 4),
-                  Text('Sur le même téléphone', style: AppTextStyles.bodySm),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.red),
-          ],
-        ),
-      ),
-    ));
-  }
-
   // 5. Section historique des parties
   Widget _buildRecentGamesSection(List<GameSummary> games) {
     return Column(
@@ -271,7 +223,21 @@ class HomeLobbyView extends StatelessWidget {
                 children: [
                   ...onlineFriends.map((f) => Padding(
                         padding: const EdgeInsets.only(right: 24),
-                        child: _FriendAvatarItem(friend: f),
+                        child: GestureDetector(
+                          onTap: () {
+                            final bloc = context.read<FriendsBloc>();
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              isScrollControlled: true,
+                              builder: (_) => BlocProvider.value(
+                                value: bloc,
+                                child: FriendProfileSheet(friend: f),
+                              ),
+                            );
+                          },
+                          child: _FriendAvatarItem(friend: f),
+                        ),
                       )),
                   _buildAddFriendItem(),
                 ],

@@ -527,17 +527,18 @@ class GameWebSocketHandler(
         
         thread(start = true) {
             try {
-                // Petit délai pour faire plus "humain"
-                Thread.sleep(500)
-                
+                // Délai avant de jouer : laisse le client voir l'état fautif
+                Thread.sleep(1500)
+
                 val color = sn.twelvepions.game.Color.valueOf(state.turn)
-                
+
                 // Mariama réclame le surplace si disponible
                 val pendingOops = oopsRegistry.get(gameId)
                 if (pendingOops != null && pendingOops.claimerColor == color) {
-                    val target = pendingOops.faultyPositions.first() // Prend la première pièce
+                    val target = pendingOops.faultyPositions.first()
                     doOopsClaim(aiId, gameId, target)
-                    Thread.sleep(300) // Délai après oops avant de jouer
+                    // Laisser le client terminer la démo surplace (≈1400ms) + marge
+                    Thread.sleep(2000)
                 }
                 
                 // Récupération de l'état frais juste avant de jouer (après éventuel oops)

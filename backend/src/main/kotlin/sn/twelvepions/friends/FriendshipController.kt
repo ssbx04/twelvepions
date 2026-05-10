@@ -44,6 +44,10 @@ class FriendshipController(private val service: FriendshipService) {
         return ResponseEntity.ok().build()
     }
 
+    @GetMapping("/friends/suggestions")
+    fun getSuggestions(@AuthenticationPrincipal userId: UUID): List<UserSearchResultDto> =
+        service.getSuggestions(userId)
+
     @GetMapping("/users/search")
     fun searchUsers(
         @AuthenticationPrincipal userId: UUID,

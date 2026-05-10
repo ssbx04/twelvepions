@@ -14,7 +14,7 @@ import '../widgets/home_lobby_view.dart';
 import '../../../play/presentation/widgets/play_tab_view.dart';
 import '../../../friends/presentation/widgets/friends_tab_view.dart';
 import '../../../profile/presentation/widgets/profile_tab_view.dart';
-import '../widgets/placeholders.dart';
+import '../../../settings/presentation/widgets/settings_tab_view.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
       const PlayTabView(),
       FriendsTabView(subTabNotifier: deeplink.friendsSubTab),
       const ProfileTabView(),
-      const SettingsPlaceholderView(),
+      const SettingsTabView(),
     ];
     _deeplinkSub = deeplink.stream.listen(_handleDeeplink);
     final pending = deeplink.consumePending();

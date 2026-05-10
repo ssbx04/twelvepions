@@ -172,7 +172,10 @@ récupérer des assets (sons, etc.).
 | **Polissage UI/UX** | Alignement local/online, timer coudou 3s systématique (anti-leak), démo animée Surplace, compteur de pions, bannières | ✅ Terminé |
 | **Onglet Amis** | Système d'amis complet : liste + présence realtime, défis directs via WS, recherche, demandes d'amis | ✅ Terminé |
 | **FCM + Deeplinks** | Notifications push hors-app (amis, défis, fin de partie) + navigation vers écran cible au tap | ✅ Terminé |
-| **Bugs Mariama OOPS** | Glitchs d'erreurs dans la partie vs IA depuis l'activation du surplace — à corriger | 🐛 Prochaine session |
+| **Bugs Mariama OOPS** | Fix délais backend (1500ms+2000ms), oopsMovedFrom dans GameActive, démo depuis position originale | ✅ Terminé |
+| **Polissage Amis** | Online friends cliquables sur home, suggestions realtime, mode 2J déplacé dans onglet Jouer | ✅ Terminé |
+| **Onglet Réglages** | Toggle sons + vibrations (SharedPreferences) | ✅ Terminé |
+| **CI/CD** | GitHub Actions + Fly.io (free, pas de sleep) ; Oracle Cloud Free Tier comme upgrade | 🔜 Prochaine session |
 | **Web SvelteKit** | Reprendre le frontend web | ⏭ Plus tard |
 | **F** | Tournois, leaderboard, historique des parties | ⏭ V2 |
 
@@ -534,6 +537,7 @@ Les 22 écrans complets (MVP + V2) sont catalogués dans `~/12pions/docs/screens
 - **Deeplink challenge** : si la cible est offline, `handleChallengeSend` crée le défi
   normalement + envoie FCM. À la reconnexion WS, `afterConnectionEstablished` appelle
   `challenges.getPendingForTarget(userId)` et livre le `game.challenge.received` via WS.
+- **`VibrationService`** : singleton statique (pas GetIt), initialisé dans `main()` comme `SoundService`. Utilise `HapticFeedback` de Flutter (pas de package externe). La clé SharedPreferences est `vibration_enabled` (bool, défaut `true`).
 - **`DeeplinkService`** : singleton GetIt. `handle(data)` convertit le payload FCM en
   `DeeplinkAction`. Si `HomePage` n'est pas encore monté → stocke en `_pending` et
   `consumePending()` le récupère dans `initState`. `friendsSubTab` est un `ValueNotifier<int>`
@@ -607,13 +611,36 @@ Tout le gameplay mobile est fonctionnel et synchronisé entre local et online :
    - Navigation : demande d'ami → onglet Amis/Demandes, acceptation → onglet Amis, fin de partie → onglet Profil, défi → onglet Accueil (WS dialog)
    - Credentials : `twelvepions-firebase-adminsdk.json` à la racine (gitignored), chargé par `run.sh`
 
-7. **Bugs Mariama OOPS** (🐛 Prochaine session)
-   - Des glitchs d'erreurs apparaissent en jeu contre Mariama depuis l'activation du surplace OOPS
-   - À investiguer : comportement de `Rules.enumerateAllLegalTurns` côté IA, gestion du `oops` block dans `game.update`, interaction entre le timer coudou et la validation surplace
+7. **Bugs Mariama OOPS** (✅ Terminé)
+   - Backend `applyOopsRemoval` : `computeOutcome` appelé avec `claimerColor.opponent()` au lieu de `claimerColor` → partie ne se terminait jamais via OOPS
+   - Délais `triggerAiIfNecessary` : 500ms → 1500ms avant claim, 300ms → 2000ms après (laisse le temps à la démo côté mobile)
+   - `oopsMovedFrom` ajouté dans `GameActive` (field + copyWith + props) : stocke la position d'origine du pion fautif AVANT son déplacement
+   - Démo OOPS dans `GameBloc` : utilise `oopsMovedFrom` pour reconstruire le plateau avant le coup fautif et calculer les captures manquées depuis la bonne position
 
-8. **Onglet Réglages** (À faire)
-   - Toggle des sons et vibrations
-   - Choix de la langue (FR/EN)
+8. **Polissage Amis** (✅ Terminé)
+   - Online friends sur home cliquables → `FriendProfileSheet` via `BlocProvider.value`
+   - Mode "2 Joueurs" déplacé de l'onglet Accueil vers l'onglet Jouer (`play_tab_view.dart`)
+   - Suggestions d'amis dans l'onglet Amis : scroll horizontal de cards carrées (128px), endpoint `GET /friends/suggestions`
+   - Suggestions realtime : `_onRequestAccepted` + `_onRequestAcceptedWs` rechargent les suggestions → la personne acceptée disparaît
+
+9. **Onglet Réglages** (✅ Terminé)
+   - `VibrationService` singleton (`core/services/vibration_service.dart`) : `init()` charge `vibration_enabled` depuis SharedPreferences, `vibrate()` / `vibrateLight()` / `vibrateHeavy()` via `HapticFeedback`, gated par `_enabled`
+   - `SoundService.setMuted(bool)` ajouté (l'ancien `toggleMute` s'appuie dessus)
+   - `SettingsTabView` (`features/settings/presentation/widgets/settings_tab_view.dart`) : 2 sections (Audio + Retours sensoriels), state initial lu depuis les singletons, persist immédiat
+   - `game_board_widget.dart` : `vibrateLight()` sur coup simple, `vibrate()` sur capture
+   - `main.dart` : `VibrationService.instance.init()` au démarrage
+   - Pas de choix de langue pour l'instant
+
+10. **CI/CD** (🔜 Prochaine session)
+    - **GitHub Actions** : pipeline sur chaque push `main`
+      - Backend : `./gradlew test` + `./gradlew bootJar`
+      - Mobile : `flutter analyze` + `flutter test`
+    - **Fly.io** comme plateforme de déploiement (free tier, pas de sleep contrairement à Render)
+      - Dockerfile backend → image Spring Boot
+      - Postgres + Redis managés sur Fly.io (petites instances gratuites)
+      - Deploy auto sur push `main` si CI vert
+    - **Oracle Cloud Free Tier** comme upgrade futur (4 cores ARM + 24GB RAM, gratuit à vie)
+    - Secrets GitHub : `FLY_API_TOKEN`, `FIREBASE_CREDENTIALS_JSON` (base64), `JWT_SECRET`
 
 ### Encore plus tard — Web SvelteKit
 

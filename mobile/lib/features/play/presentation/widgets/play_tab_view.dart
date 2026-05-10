@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../blocs/matchmaking/matchmaking_bloc.dart';
 
 class PlayTabView extends StatelessWidget {
   const PlayTabView({super.key});
@@ -41,6 +38,14 @@ class PlayTabView extends StatelessWidget {
             onTap: () {
               context.pushNamed('matchmaking', extra: {'ai': true});
             },
+          ),
+          const SizedBox(height: 24),
+          _PlayModeCard(
+            title: '2 Joueurs',
+            subtitle: 'Sur le même téléphone',
+            icon: Icons.people_rounded,
+            color: AppColors.red,
+            onTap: () => context.pushNamed('local-game'),
           ),
         ],
       ),

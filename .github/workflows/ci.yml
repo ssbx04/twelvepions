@@ -57,17 +57,11 @@ jobs:
         run: ./gradlew test --no-daemon
 
   deploy:
-    name: Deploy → Fly.io
+    name: Deploy → Render
     needs: backend
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy --remote-only
+      - name: Trigger Render deploy
+        run: curl -X POST "https://api.render.com/deploy/srv-d80bgvn7f7vs73cnj160?key=fg2669XpdZ4"

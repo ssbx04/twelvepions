@@ -58,7 +58,16 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     try {
       final friends = await _datasource.getFriends();
       final requests = await _datasource.getRequests();
-      emit(state.copyWith(status: FriendsStatus.loaded, friends: friends, requests: requests));
+      List<UserSearchResult> suggestions = [];
+      try {
+        suggestions = await _datasource.getSuggestions();
+      } catch (_) {}
+      emit(state.copyWith(
+        status: FriendsStatus.loaded,
+        friends: friends,
+        requests: requests,
+        suggestions: suggestions,
+      ));
     } catch (_) {
       emit(state.copyWith(status: FriendsStatus.error, errorMessage: 'Impossible de charger les amis'));
     }
@@ -82,19 +91,13 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
   Future<void> _onRequestSent(FriendRequestSent event, Emitter<FriendsState> emit) async {
     try {
       await _datasource.sendRequest(event.targetId);
-      final updated = state.searchResults.map((r) {
-        if (r.id == event.targetId) {
-          return UserSearchResult(
-            id: r.id,
-            username: r.username,
-            fullName: r.fullName,
-            elo: r.elo,
-            friendshipStatus: 'PENDING_SENT',
-          );
-        }
-        return r;
-      }).toList();
-      emit(state.copyWith(searchResults: updated));
+      UserSearchResult markSent(UserSearchResult r) => r.id == event.targetId
+          ? UserSearchResult(id: r.id, username: r.username, fullName: r.fullName, elo: r.elo, friendshipStatus: 'PENDING_SENT')
+          : r;
+      emit(state.copyWith(
+        searchResults: state.searchResults.map(markSent).toList(),
+        suggestions: state.suggestions.map(markSent).toList(),
+      ));
     } catch (_) {}
   }
 
@@ -103,9 +106,12 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
       await _datasource.acceptRequest(event.requestId);
       final newRequests = state.requests.where((r) => r.requestId != event.requestId).toList();
       emit(state.copyWith(requests: newRequests));
-      // Recharger la liste d'amis
       final friends = await _datasource.getFriends();
-      emit(state.copyWith(friends: friends));
+      List<UserSearchResult> suggestions = state.suggestions;
+      try {
+        suggestions = await _datasource.getSuggestions();
+      } catch (_) {}
+      emit(state.copyWith(friends: friends, suggestions: suggestions));
     } catch (_) {}
   }
 
@@ -139,7 +145,11 @@ class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
   Future<void> _onRequestAcceptedWs(_FriendRequestAcceptedWs event, Emitter<FriendsState> emit) async {
     try {
       final friends = await _datasource.getFriends();
-      emit(state.copyWith(friends: friends));
+      List<UserSearchResult> suggestions = state.suggestions;
+      try {
+        suggestions = await _datasource.getSuggestions();
+      } catch (_) {}
+      emit(state.copyWith(friends: friends, suggestions: suggestions));
     } catch (_) {}
   }
 

@@ -36,6 +36,7 @@ class GameActive extends GameState {
 
   // --- Surplace (OOPS) ---
   final List<Map<String, int>> oopsFaultyPositions; // Positions des pions adverses fautifs
+  final Map<String, int>? oopsMovedFrom; // Position originale du pion fautif avant son coup simple
   final bool surplaceMode; // true quand le joueur est en mode surplace (clic sur pion fautif)
   final bool oopsJustHappened; // true quand un surplace vient d'être appliqué (pour le banner)
 
@@ -62,6 +63,7 @@ class GameActive extends GameState {
     this.localMustContinueFrom,
     this.coudouDeadlineEpochMs,
     this.oopsFaultyPositions = const [],
+    this.oopsMovedFrom,
     this.surplaceMode = false,
     this.oopsJustHappened = false,
     this.isOpponentDisconnected = false,
@@ -92,6 +94,7 @@ class GameActive extends GameState {
         localMustContinueFrom,
         coudouDeadlineEpochMs,
         oopsFaultyPositions,
+        oopsMovedFrom,
         surplaceMode,
         oopsJustHappened,
         isOpponentDisconnected,
@@ -117,6 +120,7 @@ class GameActive extends GameState {
     Map<String, int>? localMustContinueFrom,
     int? coudouDeadlineEpochMs,
     List<Map<String, int>>? oopsFaultyPositions,
+    Map<String, int>? oopsMovedFrom,
     bool? surplaceMode,
     bool? oopsJustHappened,
     bool? isOpponentDisconnected,
@@ -144,6 +148,7 @@ class GameActive extends GameState {
       localMustContinueFrom: localMustContinueFrom ?? this.localMustContinueFrom,
       coudouDeadlineEpochMs: clearCoudouDeadline ? null : (coudouDeadlineEpochMs ?? this.coudouDeadlineEpochMs),
       oopsFaultyPositions: oopsFaultyPositions ?? this.oopsFaultyPositions,
+      oopsMovedFrom: oopsMovedFrom ?? this.oopsMovedFrom,
       surplaceMode: surplaceMode ?? this.surplaceMode,
       oopsJustHappened: oopsJustHappened ?? false,
       isOpponentDisconnected: isOpponentDisconnected ?? this.isOpponentDisconnected,

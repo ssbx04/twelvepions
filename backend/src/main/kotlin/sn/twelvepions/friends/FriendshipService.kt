@@ -92,6 +92,18 @@ class FriendshipService(
         friendships.delete(f)
     }
 
+    fun getSuggestions(userId: UUID): List<UserSearchResultDto> {
+        return users.findSuggestedUsers(userId, PageRequest.of(0, 10)).map { user ->
+            UserSearchResultDto(
+                id = user.id.toString(),
+                username = user.username ?: user.phone,
+                fullName = user.fullName,
+                elo = user.elo,
+                friendshipStatus = "NONE",
+            )
+        }
+    }
+
     fun searchUsers(query: String, currentUserId: UUID): List<UserSearchResultDto> {
         if (query.length < 2) return emptyList()
         val results = users.searchByUsernameOrName(query, PageRequest.of(0, 20))

@@ -10,4 +10,4 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-          curl -sf "https://twelvepions.fly.dev/health" && echo "OK" || echo "Backend sleeping, wake-up triggered"
+          curl -sf "https://twelvepions.onrender.com/health" && echo "OK" || echo "Backend sleeping, wake-up triggered"

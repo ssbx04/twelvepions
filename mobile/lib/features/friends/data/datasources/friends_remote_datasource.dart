@@ -57,6 +57,15 @@ class FriendsRemoteDataSource {
     }
   }
 
+  Future<List<UserSearchResultModel>> getSuggestions() async {
+    try {
+      final res = await dio.get(ApiEndpoints.friendsSuggestions, options: await _authOptions());
+      return (res.data as List).map((e) => UserSearchResultModel.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw _toException(e);
+    }
+  }
+
   Future<List<UserSearchResultModel>> searchUsers(String query) async {
     try {
       final res = await dio.get(ApiEndpoints.usersSearch, queryParameters: {'q': query}, options: await _authOptions());

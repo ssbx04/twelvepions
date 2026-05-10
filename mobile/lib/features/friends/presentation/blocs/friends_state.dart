@@ -7,6 +7,7 @@ class FriendsState extends Equatable {
   final List<Friend> friends;
   final List<FriendRequest> requests;
   final List<UserSearchResult> searchResults;
+  final List<UserSearchResult> suggestions;
   final String searchQuery;
   final bool isSearching;
   final String? errorMessage;
@@ -16,6 +17,7 @@ class FriendsState extends Equatable {
     this.friends = const [],
     this.requests = const [],
     this.searchResults = const [],
+    this.suggestions = const [],
     this.searchQuery = '',
     this.isSearching = false,
     this.errorMessage,
@@ -26,6 +28,7 @@ class FriendsState extends Equatable {
     List<Friend>? friends,
     List<FriendRequest>? requests,
     List<UserSearchResult>? searchResults,
+    List<UserSearchResult>? suggestions,
     String? searchQuery,
     bool? isSearching,
     String? errorMessage,
@@ -35,11 +38,12 @@ class FriendsState extends Equatable {
         friends: friends ?? this.friends,
         requests: requests ?? this.requests,
         searchResults: searchResults ?? this.searchResults,
+        suggestions: suggestions ?? this.suggestions,
         searchQuery: searchQuery ?? this.searchQuery,
         isSearching: isSearching ?? this.isSearching,
         errorMessage: errorMessage ?? this.errorMessage,
       );
 
   @override
-  List<Object?> get props => [status, friends, requests, searchResults, searchQuery, isSearching, errorMessage];
+  List<Object?> get props => [status, friends, requests, searchResults, suggestions, searchQuery, isSearching, errorMessage];
 }

@@ -8,6 +8,7 @@ import 'core/di/service_locator.dart';
 import 'core/services/deeplink_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/sound_service.dart';
+import 'core/services/vibration_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
@@ -34,6 +35,7 @@ Future<void> main() async {
   await setupServiceLocator();
   await NotificationService().init();
   await SoundService.instance.init();
+  await VibrationService.instance.init();
 
   // App en arrière-plan : l'utilisateur tape la notification.
   FirebaseMessaging.onMessageOpenedApp.listen((message) {

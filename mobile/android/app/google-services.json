@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "440838831672",
+    "project_id": "twelvepions",
+    "storage_bucket": "twelvepions.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:440838831672:android:7fb7b0ff9114d130fbf0cd",
+        "android_client_info": {
+          "package_name": "sn.twelvepions.twelvepions"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByrqVRaMUEQMT0YyRSpTyp_ZO5h8VQ3JU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -87,7 +87,11 @@ class _FriendsContentState extends State<_FriendsContent>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _FriendsList(friends: state.friends, status: state.status),
+                      _FriendsMainTab(
+                        friends: state.friends,
+                        suggestions: state.suggestions,
+                        status: state.status,
+                      ),
                       _RequestsList(requests: state.requests),
                     ],
                   ),
@@ -177,38 +181,270 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-// ─── Friends list ─────────────────────────────────────────────────────────────
+// ─── Friends main tab (online + suggestions + list) ──────────────────────────
 
-class _FriendsList extends StatelessWidget {
+class _FriendsMainTab extends StatelessWidget {
   final List<Friend> friends;
+  final List<UserSearchResult> suggestions;
   final FriendsStatus status;
 
-  const _FriendsList({required this.friends, required this.status});
+  const _FriendsMainTab({required this.friends, required this.suggestions, required this.status});
 
   @override
   Widget build(BuildContext context) {
     if (status == FriendsStatus.loading) {
       return const Center(child: CircularProgressIndicator(color: AppColors.green));
     }
-    if (friends.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.group_off_outlined, size: 48, color: AppColors.textSecondary),
-            const SizedBox(height: 12),
-            Text('Aucun ami pour l\'instant', style: TextStyle(color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            Text('Recherche des joueurs ci-dessus', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          ],
+
+    final onlineFriends = friends
+        .where((f) => f.presence == Presence.online || f.presence == Presence.inGame)
+        .toList();
+
+    return CustomScrollView(
+      slivers: [
+        // Section amis en ligne
+        if (onlineFriends.isNotEmpty) ...[
+          _sectionHeader('EN LIGNE (${onlineFriends.length})'),
+          SliverToBoxAdapter(child: _OnlineFriendsRow(friends: onlineFriends)),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        ],
+
+        // Section suggestions
+        if (suggestions.isNotEmpty) ...[
+          _sectionHeader('SUGGESTIONS'),
+          SliverToBoxAdapter(child: _SuggestionsRow(suggestions: suggestions)),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        ],
+
+        // Liste complète
+        if (friends.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.group_off_outlined, size: 48, color: AppColors.textSecondary),
+                  const SizedBox(height: 12),
+                  Text('Aucun ami pour l\'instant', style: TextStyle(color: AppColors.textSecondary)),
+                  const SizedBox(height: 4),
+                  Text('Recherche des joueurs ci-dessus', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                ],
+              ),
+            ),
+          )
+        else ...[
+          _sectionHeader('TOUS MES AMIS'),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList.separated(
+              itemCount: friends.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => _FriendTile(friend: friends[i]),
+            ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
+    );
+  }
+
+  Widget _sectionHeader(String title) => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+          child: Text(title,
+              style: const TextStyle(color: AppColors.yellow, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
         ),
       );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      itemCount: friends.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) => _FriendTile(friend: friends[i]),
+}
+
+// ─── Online friends horizontal row ───────────────────────────────────────────
+
+class _OnlineFriendsRow extends StatelessWidget {
+  final List<Friend> friends;
+  const _OnlineFriendsRow({required this.friends});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 90,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: friends.length,
+        itemBuilder: (context, i) {
+          final f = friends[i];
+          return Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: GestureDetector(
+              onTap: () {
+                final bloc = context.read<FriendsBloc>();
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (_) => BlocProvider.value(
+                    value: bloc,
+                    child: FriendProfileSheet(friend: f),
+                  ),
+                );
+              },
+              child: _OnlineFriendAvatar(friend: f),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _OnlineFriendAvatar extends StatelessWidget {
+  final Friend friend;
+  const _OnlineFriendAvatar({required this.friend});
+
+  @override
+  Widget build(BuildContext context) {
+    final dotColor = friend.presence == Presence.inGame ? AppColors.yellow : AppColors.green;
+    final parts = (friend.fullName ?? friend.username).trim().split(' ');
+    final initials = parts.length >= 2
+        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+        : friend.username.substring(0, friend.username.length.clamp(0, 2)).toUpperCase();
+
+    return Column(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: dotColor, width: 2),
+                boxShadow: [BoxShadow(color: dotColor.withValues(alpha: 0.3), blurRadius: 8, spreadRadius: 1)],
+              ),
+              child: CircleAvatar(
+                radius: 26,
+                backgroundColor: AppColors.yellow,
+                child: Text(initials,
+                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF1A0F08), width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          friend.username.length > 7 ? '${friend.username.substring(0, 6)}…' : friend.username,
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Suggestions horizontal row ──────────────────────────────────────────────
+
+class _SuggestionsRow extends StatelessWidget {
+  final List<UserSearchResult> suggestions;
+  const _SuggestionsRow({required this.suggestions});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 168,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: suggestions.length,
+        itemBuilder: (context, i) => Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: _SuggestionCard(result: suggestions[i]),
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  final UserSearchResult result;
+  const _SuggestionCard({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final isNone = result.friendshipStatus == 'NONE';
+    final isSent = result.friendshipStatus == 'PENDING_SENT';
+
+    return Container(
+      width: 128,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1218),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _Avatar(name: result.fullName ?? result.username, size: 48),
+          const SizedBox(height: 8),
+          Text(
+            result.username.length > 10 ? '${result.username.substring(0, 9)}…' : result.username,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.star, color: AppColors.yellow, size: 11),
+              const SizedBox(width: 3),
+              Text('${result.elo}', style: const TextStyle(color: AppColors.yellow, fontSize: 11, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (isSent)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text('Envoyé', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+            )
+          else if (isNone)
+            GestureDetector(
+              onTap: () => context.read<FriendsBloc>().add(FriendRequestSent(result.id)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.green.withValues(alpha: 0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.person_add_outlined, color: AppColors.green, size: 13),
+                    SizedBox(width: 4),
+                    Text('Ajouter', style: TextStyle(color: AppColors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -274,7 +510,7 @@ class _FriendTile extends StatelessWidget {
       isScrollControlled: true,
       builder: (_) => BlocProvider.value(
         value: bloc,
-        child: _FriendProfileSheet(friend: friend),
+        child: FriendProfileSheet(friend: friend),
       ),
     );
   }
@@ -283,9 +519,9 @@ class _FriendTile extends StatelessWidget {
 
 // ─── Friend profile bottom sheet ─────────────────────────────────────────────
 
-class _FriendProfileSheet extends StatelessWidget {
+class FriendProfileSheet extends StatelessWidget {
   final Friend friend;
-  const _FriendProfileSheet({required this.friend});
+  const FriendProfileSheet({super.key, required this.friend});
 
   @override
   Widget build(BuildContext context) {

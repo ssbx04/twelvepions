@@ -69,10 +69,14 @@ class SoundService {
     } catch (_) {}
   }
 
-  Future<void> toggleMute() async {
-    _muted = !_muted;
+  Future<void> setMuted(bool value) async {
+    _muted = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('sound_muted', _muted);
+  }
+
+  Future<void> toggleMute() async {
+    await setMuted(!_muted);
   }
 
   void dispose() {

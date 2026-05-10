@@ -118,7 +118,7 @@ class GameService(
         newBoard = Rules.autoPromoteLast(newBoard)
         game.board = serializeBoard(newBoard)
 
-        val outcome = Rules.computeOutcome(newBoard, claimerColor.opponent())
+        val outcome = Rules.computeOutcome(newBoard, claimerColor)
         if (outcome != null) {
             handleEnd(game, outcome)
         }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sound_service.dart';
+import '../../../../core/services/vibration_service.dart';
 import 'pion_widget.dart';
 
 class GameBoardWidget extends StatefulWidget {
@@ -160,13 +161,15 @@ class _GameBoardWidgetState extends State<GameBoardWidget>
     }
     _pieces.removeWhere((p) => !matchedOldIds.contains(p.id));
 
-    // Sons
+    // Sons + vibrations
     if (hadCapture) {
       SoundService.instance.play(SoundType.capture);
+      VibrationService.instance.vibrate();
     } else if (toAdd.isEmpty && dying.isEmpty) {
-      // Pas de changement = pas de son
+      // Pas de changement = pas de son/vibration
     } else {
       SoundService.instance.play(SoundType.move);
+      VibrationService.instance.vibrateLight();
     }
 
     setState(() {});

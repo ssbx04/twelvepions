@@ -33,6 +33,7 @@ class ApiEndpoints {
   static const String friendsRequests = '/friends/requests';
   static const String friendsRequest = '/friends/request';
   static const String friendsAccept = '/friends/accept';
+  static const String friendsSuggestions = '/friends/suggestions';
   static const String usersSearch = '/users/search';
 }
 
