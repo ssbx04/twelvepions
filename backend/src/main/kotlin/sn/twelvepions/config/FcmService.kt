@@ -9,6 +9,7 @@ import com.google.firebase.messaging.Notification
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import sn.twelvepions.auth.UserRepository
+import java.util.Base64
 import java.util.UUID
 
 @Service
@@ -18,9 +19,12 @@ class FcmService(private val users: UserRepository) {
     private val enabled: Boolean
 
     init {
-        val json = System.getenv("FIREBASE_CREDENTIALS_JSON")
-        enabled = if (!json.isNullOrBlank()) {
+        val raw = System.getenv("FIREBASE_CREDENTIALS_JSON")
+        enabled = if (!raw.isNullOrBlank()) {
             runCatching {
+                // Accepte JSON brut ou JSON encodé en base64.
+                val json = runCatching { Base64.getDecoder().decode(raw).toString(Charsets.UTF_8) }
+                    .getOrDefault(raw)
                 val credentials = GoogleCredentials.fromStream(json.byteInputStream())
                 val options = FirebaseOptions.builder().setCredentials(credentials).build()
                 if (FirebaseApp.getApps().isEmpty()) FirebaseApp.initializeApp(options)
