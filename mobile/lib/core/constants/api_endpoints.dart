@@ -11,12 +11,12 @@ class ApiEndpoints {
 
   static const String baseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://twelvepions.onrender.com',
   );
 
   static const String wsUrl = String.fromEnvironment(
     'WS_URL',
-    defaultValue: 'ws://localhost:8080/ws',
+    defaultValue: 'wss://twelvepions.onrender.com/ws',
   );
 
   static const String authPhone = '/auth/phone';
