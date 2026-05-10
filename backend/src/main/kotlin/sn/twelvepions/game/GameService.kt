@@ -1,5 +1,6 @@
 package sn.twelvepions.game
 
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import sn.twelvepions.auth.UserRepository
@@ -25,6 +26,7 @@ class GameService(
     private val elo: EloService,
     private val mapper: ObjectMapper,
 ) {
+    private val log = LoggerFactory.getLogger(GameService::class.java)
 
     @Transactional
     fun createGame(playerXId: UUID, playerOId: UUID): GameStateDto {
@@ -223,9 +225,14 @@ class GameService(
     private fun applyEloUpdate(game: GameEntity) {
         val mariama = java.util.UUID(0, 0)
         if (game.playerXId == mariama || game.playerOId == mariama) return
-        val (deltaX, deltaO) = elo.applyResult(game.playerXId, game.playerOId, game.winner)
-        game.eloChangeX = deltaX
-        game.eloChangeO = deltaO
+        try {
+            val (deltaX, deltaO) = elo.applyResult(game.playerXId, game.playerOId, game.winner)
+            game.eloChangeX = deltaX
+            game.eloChangeO = deltaO
+            log.info("ELO applied: game={} winner={} deltaX={} deltaO={}", game.id, game.winner, deltaX, deltaO)
+        } catch (e: Exception) {
+            log.error("ELO update failed for game={}: {}", game.id, e.message, e)
+        }
     }
 
     private fun sequenceToTurn(seq: List<MoveDto>): Turn {
