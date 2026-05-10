@@ -62,7 +62,8 @@ class ReconnectGuard(
             )
             registry.broadcast(listOf(xId, oId), payload)
             // userId est offline par définition ici
-            fcm.sendToUser(userId, "12 Pions", "Tu as perdu par forfait (déconnexion).")
+            fcm.sendToUser(userId, "12 Pions", "Tu as perdu par forfait (déconnexion).",
+                mapOf("type" to "game_ended", "gameId" to gameId.toString()))
         } catch (e: Exception) {
             log.error("Disconnect forfeit failed for user={} game={}", userId, gameId, e)
         }

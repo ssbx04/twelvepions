@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -6,6 +8,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/app_background.dart';
 import '../../../../core/storage/auth_local_storage.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/services/deeplink_service.dart';
 import '../../../game/presentation/widgets/tutorial_overlay.dart';
 import '../widgets/home_lobby_view.dart';
 import '../../../play/presentation/widgets/play_tab_view.dart';
@@ -23,19 +26,47 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   bool _showTutorial = false;
+  StreamSubscription<DeeplinkAction>? _deeplinkSub;
 
-  final List<Widget> _views = const [
-    HomeLobbyView(),
-    PlayTabView(),
-    FriendsTabView(),
-    ProfileTabView(),
-    SettingsPlaceholderView(),
-  ];
+  late final List<Widget> _views;
+
+  static const int _tabFriends = 2;
+  static const int _tabProfile = 3;
 
   @override
   void initState() {
     super.initState();
+    final deeplink = sl<DeeplinkService>();
+    _views = [
+      const HomeLobbyView(),
+      const PlayTabView(),
+      FriendsTabView(subTabNotifier: deeplink.friendsSubTab),
+      const ProfileTabView(),
+      const SettingsPlaceholderView(),
+    ];
+    _deeplinkSub = deeplink.stream.listen(_handleDeeplink);
+    final pending = deeplink.consumePending();
+    if (pending != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _handleDeeplink(pending));
+    }
     _checkTutorial();
+  }
+
+  void _handleDeeplink(DeeplinkAction action) {
+    if (!mounted) return;
+    setState(() {
+      _currentIndex = switch (action) {
+        DeeplinkAction.openFriends || DeeplinkAction.openFriendsRequests => _tabFriends,
+        DeeplinkAction.openProfile => _tabProfile,
+        DeeplinkAction.openHome => 0,
+      };
+    });
+  }
+
+  @override
+  void dispose() {
+    _deeplinkSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkTutorial() async {

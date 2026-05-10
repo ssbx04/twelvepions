@@ -82,7 +82,8 @@ class TurnTimer(
             )
             registry.broadcast(listOf(xId, oId), payload)
             listOf(xId, oId).filter { registry.get(it) == null }.forEach { offlineId ->
-                fcm.sendToUser(offlineId, "12 Pions", "Tu as perdu par forfait (temps écoulé).")
+                fcm.sendToUser(offlineId, "12 Pions", "Tu as perdu par forfait (temps écoulé).",
+                    mapOf("type" to "game_ended", "gameId" to gameId.toString()))
             }
         } catch (e: Exception) {
             log.error("Turn timeout failed for game={}", gameId, e)

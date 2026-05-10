@@ -456,7 +456,9 @@ class GameWebSocketHandler(
             )))
         } else {
             fcm.sendToUser(targetId, "12 Pions",
-                "${challenger.username ?: "Un joueur"} vous défie ! Ouvrez l'app pour accepter.")
+                "${challenger.username ?: "Un joueur"} vous défie ! Ouvrez l'app pour accepter.",
+                mapOf("type" to "challenge_received", "challengeId" to challengeId.toString(),
+                      "challengerId" to userId.toString()))
         }
         sendJson(session, mapOf("type" to "game.challenge.sent", "challengeId" to challengeId.toString()))
     }

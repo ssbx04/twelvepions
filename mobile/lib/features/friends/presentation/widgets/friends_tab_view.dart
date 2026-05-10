@@ -9,14 +9,16 @@ import '../../domain/entities/friend.dart';
 import '../blocs/friends_bloc.dart';
 
 class FriendsTabView extends StatelessWidget {
-  const FriendsTabView({super.key});
+  final ValueNotifier<int>? subTabNotifier;
+  const FriendsTabView({super.key, this.subTabNotifier});
 
   @override
-  Widget build(BuildContext context) => const _FriendsContent();
+  Widget build(BuildContext context) => _FriendsContent(subTabNotifier: subTabNotifier);
 }
 
 class _FriendsContent extends StatefulWidget {
-  const _FriendsContent();
+  final ValueNotifier<int>? subTabNotifier;
+  const _FriendsContent({this.subTabNotifier});
 
   @override
   State<_FriendsContent> createState() => _FriendsContentState();
@@ -31,10 +33,17 @@ class _FriendsContentState extends State<_FriendsContent>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    widget.subTabNotifier?.addListener(_onSubTabChanged);
+  }
+
+  void _onSubTabChanged() {
+    final idx = widget.subTabNotifier!.value;
+    if (_tabController.index != idx) _tabController.animateTo(idx);
   }
 
   @override
   void dispose() {
+    widget.subTabNotifier?.removeListener(_onSubTabChanged);
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();

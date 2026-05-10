@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'core/di/service_locator.dart';
+import 'core/services/deeplink_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/sound_service.dart';
 
@@ -33,6 +34,17 @@ Future<void> main() async {
   await setupServiceLocator();
   await NotificationService().init();
   await SoundService.instance.init();
+
+  // App en arrière-plan : l'utilisateur tape la notification.
+  FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    sl<DeeplinkService>().handle(message.data);
+  });
+
+  // App complètement fermée : récupérer la notification qui a ouvert l'app.
+  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+  if (initialMessage != null) {
+    sl<DeeplinkService>().handle(initialMessage.data);
+  }
 
   runApp(const TwelvePionsApp());
 }

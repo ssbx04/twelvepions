@@ -56,7 +56,8 @@ class FriendshipService(
                 "fromElo" to requester.elo,
             )))
         } else {
-            fcm.sendToUser(targetId, "12 Pions", "$senderName vous a envoyé une demande d'ami !")
+            fcm.sendToUser(targetId, "12 Pions", "$senderName vous a envoyé une demande d'ami !",
+                mapOf("type" to "friend_request", "requestId" to saved.id.toString()))
         }
     }
 
@@ -78,7 +79,8 @@ class FriendshipService(
                 "byElo" to accepter.elo,
             )))
         } else {
-            fcm.sendToUser(f.requesterId, "12 Pions", "$accepterName a accepté votre demande d'ami !")
+            fcm.sendToUser(f.requesterId, "12 Pions", "$accepterName a accepté votre demande d'ami !",
+                mapOf("type" to "friend_accepted"))
         }
     }
 
