@@ -230,7 +230,11 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         ));
       }
     } else if (type == 'error') {
-      emit(GameError(event.message['message'] as String? ?? 'Erreur inconnue'));
+      const silentErrors = {'invalid_target', 'no_oops_pending', 'not_your_oops', 'illegal_move'};
+      final code = event.message['code'] as String? ?? '';
+      if (!silentErrors.contains(code)) {
+        emit(GameError(event.message['message'] as String? ?? 'Erreur inconnue'));
+      }
     }
   }
 
