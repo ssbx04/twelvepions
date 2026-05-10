@@ -229,7 +229,7 @@ class GameService(
             val (deltaX, deltaO) = elo.applyResult(game.playerXId, game.playerOId, game.winner)
             game.eloChangeX = deltaX
             game.eloChangeO = deltaO
-            log.info("ELO applied: game={} winner={} deltaX={} deltaO={}", game.id, game.winner, deltaX, deltaO)
+            log.info("ELO applied: game={} winner={} eloX={} eloO={} deltaX={} deltaO={}", game.id, game.winner, game.playerXEloBefore, game.playerOEloBefore, deltaX, deltaO)
         } catch (e: Exception) {
             log.error("ELO update failed for game={}: {}", game.id, e.message, e)
         }
