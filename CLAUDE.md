@@ -171,8 +171,9 @@ récupérer des assets (sons, etc.).
 | **Gameplay complet** | Surplace, coudou animé étape par étape, match nul, timer fin de partie, mode local 2 joueurs | ✅ Terminé |
 | **Polissage UI/UX** | Alignement local/online, timer coudou 3s systématique (anti-leak), démo animée Surplace, compteur de pions, bannières | ✅ Terminé |
 | **Onglet Amis** | Système d'amis complet : liste + présence realtime, défis directs via WS, recherche, demandes d'amis | ✅ Terminé |
+| **FCM + Deeplinks** | Notifications push hors-app (amis, défis, fin de partie) + navigation vers écran cible au tap | ✅ Terminé |
+| **Bugs Mariama OOPS** | Glitchs d'erreurs dans la partie vs IA depuis l'activation du surplace — à corriger | 🐛 Prochaine session |
 | **Web SvelteKit** | Reprendre le frontend web | ⏭ Plus tard |
-| **FCM** | Firebase Cloud Messaging pour notifications push hors-app | ⏸ Prochaine session |
 | **F** | Tournois, leaderboard, historique des parties | ⏭ V2 |
 
 ## État courant détaillé (mobile auth)
@@ -527,6 +528,16 @@ Les 22 écrans complets (MVP + V2) sont catalogués dans `~/12pions/docs/screens
 - **`pushPresence()` dans le handler WS** : à chaque connexion/déconnexion, on requête
   la DB pour trouver les amis acceptés et on envoie `friend.presence.changed` à chaque
   ami online. Coût DB acceptable pour le MVP (O(n) amis par connexion).
+- **FCM credentials** : le fichier `twelvepions-firebase-adminsdk.json` doit être à la
+  racine `~/12pions/` (gitignored). `run.sh` l'injecte en `FIREBASE_CREDENTIALS_JSON`.
+  Si absent, FCM est désactivé gracieusement (log info, pas de crash).
+- **Deeplink challenge** : si la cible est offline, `handleChallengeSend` crée le défi
+  normalement + envoie FCM. À la reconnexion WS, `afterConnectionEstablished` appelle
+  `challenges.getPendingForTarget(userId)` et livre le `game.challenge.received` via WS.
+- **`DeeplinkService`** : singleton GetIt. `handle(data)` convertit le payload FCM en
+  `DeeplinkAction`. Si `HomePage` n'est pas encore monté → stocke en `_pending` et
+  `consumePending()` le récupère dans `initState`. `friendsSubTab` est un `ValueNotifier<int>`
+  passé à `FriendsTabView` pour animer le sous-onglet.
 
 ## Prochaines étapes précises
 
@@ -586,12 +597,21 @@ Tout le gameplay mobile est fonctionnel et synchronisé entre local et online :
    - Défi direct : `game.challenge.send` → dialog 30s chez le destinataire → accepter → les deux naviguent vers la partie
    - `GlobalWsListener` gère : `game.challenge.received`, `game.challenge.declined/expired`, `game.matched`, `friend.request.received/accepted`
 
-6. **Firebase Cloud Messaging** (Prochaine session)
-   - Notifications push hors-app pour : défis reçus, demandes d'amis, fin de partie
-   - Backend : token FCM stocké en DB, envoi depuis `FriendshipService` et `GameWebSocketHandler`
-   - Mobile : `firebase_messaging` plugin, demande de permission, gestion foreground/background
+6. **Firebase Cloud Messaging + Deeplinks** (✅ Terminé)
+   - Backend : `FcmService` (Firebase Admin SDK, init depuis `FIREBASE_CREDENTIALS_JSON`), `V4__fcm_token.sql`, `POST /me/fcm-token`
+   - `FriendshipService` : FCM si destinataire offline (demande reçue/acceptée), avec `data` payload `{type, requestId}`
+   - `GameWebSocketHandler` : défi offline → FCM + livraison WS à la reconnexion via `getPendingForTarget()`
+   - `TurnTimer` + `ReconnectGuard` : FCM au joueur offline sur fin de partie (timeout/forfait)
+   - Mobile : `firebase_core` + `firebase_messaging`, `FcmTokenService` (permission + upload token), `NotificationService.showFcmNotification` (foreground)
+   - `DeeplinkService` : stream d'actions + `ValueNotifier` sous-onglet Amis. Handlers `onMessageOpenedApp` + `getInitialMessage`
+   - Navigation : demande d'ami → onglet Amis/Demandes, acceptation → onglet Amis, fin de partie → onglet Profil, défi → onglet Accueil (WS dialog)
+   - Credentials : `twelvepions-firebase-adminsdk.json` à la racine (gitignored), chargé par `run.sh`
 
-7. **Onglet Réglages** (À faire)
+7. **Bugs Mariama OOPS** (🐛 Prochaine session)
+   - Des glitchs d'erreurs apparaissent en jeu contre Mariama depuis l'activation du surplace OOPS
+   - À investiguer : comportement de `Rules.enumerateAllLegalTurns` côté IA, gestion du `oops` block dans `game.update`, interaction entre le timer coudou et la validation surplace
+
+8. **Onglet Réglages** (À faire)
    - Toggle des sons et vibrations
    - Choix de la langue (FR/EN)
 
