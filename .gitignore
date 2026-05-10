@@ -59,3 +59,4 @@ yarn-error.log*
 .env.local
 *.pem
 *.key
+*-firebase-adminsdk*.json

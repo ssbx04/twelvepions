@@ -59,6 +59,11 @@ fi
 
 # 3. Backend (en arrière-plan)
 log "Démarrage du backend Spring Boot…"
+FCM_CREDS_PATH="$ROOT/twelvepions-firebase-adminsdk.json"
+if [[ -f "$FCM_CREDS_PATH" ]]; then
+  export FIREBASE_CREDENTIALS_JSON="$(cat "$FCM_CREDS_PATH")"
+  ok "Firebase credentials chargées depuis $FCM_CREDS_PATH"
+fi
 (cd "$ROOT/backend" && ./gradlew --console=plain bootRun) &
 BACKEND_PID=$!
 
