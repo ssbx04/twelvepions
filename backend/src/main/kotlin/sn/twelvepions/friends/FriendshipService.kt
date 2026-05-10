@@ -10,6 +10,8 @@ import sn.twelvepions.ws.SessionRegistry
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
 
+private val MARIAMA_ID: UUID = UUID(0, 0)
+
 @Service
 class FriendshipService(
     private val friendships: FriendshipRepository,
@@ -40,6 +42,7 @@ class FriendshipService(
     @Transactional
     fun sendRequest(requesterId: UUID, targetId: UUID) {
         require(requesterId != targetId) { "Cannot add yourself" }
+        require(targetId != MARIAMA_ID) { "Cannot add Mariama as a friend" }
         val existing = friendships.findBetween(requesterId, targetId)
         require(existing == null) { "Friendship already exists or pending" }
         val target = users.findById(targetId).orElseThrow { IllegalArgumentException("User not found") }

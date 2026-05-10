@@ -430,6 +430,7 @@ class GameWebSocketHandler(
             ?: run { sendError(session, "bad_payload", "targetId manquant ou invalide"); return }
 
         if (targetId == userId) { sendError(session, "bad_challenge", "Impossible de se défier soi-même"); return }
+        if (targetId == UUID(0, 0)) { sendError(session, "bad_challenge", "Impossible de défier Mariama directement"); return }
         if (gameService.findActiveGameOf(targetId) != null) { sendError(session, "target_in_game", "Ce joueur est déjà en partie"); return }
         if (gameService.findActiveGameOf(userId) != null) { sendError(session, "already_in_game", "Tu es déjà en partie"); return }
 
