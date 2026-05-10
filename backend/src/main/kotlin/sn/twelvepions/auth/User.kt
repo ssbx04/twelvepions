@@ -30,7 +30,7 @@ class User(
     var level: UserLevel? = null,
 
     @Column(nullable = false)
-    var elo: Int = 1000,
+    var elo: Int = 0,
 
     @Column(name = "fcm_token")
     var fcmToken: String? = null,

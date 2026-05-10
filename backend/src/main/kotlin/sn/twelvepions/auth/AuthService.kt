@@ -34,7 +34,6 @@ class AuthService(
         user.fullName = req.fullName.trim()
         user.username = req.username
         user.level = req.level
-        user.elo = req.level.seedElo
         users.save(user)
 
         return buildAuthResponse(user)
