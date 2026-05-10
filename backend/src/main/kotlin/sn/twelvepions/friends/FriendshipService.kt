@@ -4,6 +4,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import sn.twelvepions.auth.UserRepository
+import sn.twelvepions.config.FcmService
 import sn.twelvepions.game.GameService
 import sn.twelvepions.ws.SessionRegistry
 import tools.jackson.databind.ObjectMapper
@@ -15,6 +16,7 @@ class FriendshipService(
     private val users: UserRepository,
     private val sessions: SessionRegistry,
     private val gameService: GameService,
+    private val fcm: FcmService,
     private val mapper: ObjectMapper,
 ) {
 
@@ -44,14 +46,18 @@ class FriendshipService(
         val requester = users.findById(requesterId).orElseThrow()
         val saved = friendships.save(Friendship(requesterId = requesterId, addresseeId = targetId))
 
-        // Push WS si la cible est connectée
-        sessions.send(targetId, mapper.writeValueAsString(mapOf(
-            "type" to "friend.request.received",
-            "requestId" to saved.id.toString(),
-            "fromId" to requesterId.toString(),
-            "fromUsername" to (requester.username ?: requester.phone),
-            "fromElo" to requester.elo,
-        )))
+        val senderName = requester.username ?: requester.phone
+        if (sessions.get(targetId) != null) {
+            sessions.send(targetId, mapper.writeValueAsString(mapOf(
+                "type" to "friend.request.received",
+                "requestId" to saved.id.toString(),
+                "fromId" to requesterId.toString(),
+                "fromUsername" to senderName,
+                "fromElo" to requester.elo,
+            )))
+        } else {
+            fcm.sendToUser(targetId, "12 Pions", "$senderName vous a envoyé une demande d'ami !")
+        }
     }
 
     @Transactional
@@ -62,14 +68,18 @@ class FriendshipService(
         f.status = "ACCEPTED"
         friendships.save(f)
 
-        // Notifier le demandeur que sa demande a été acceptée
         val accepter = users.findById(userId).orElseThrow()
-        sessions.send(f.requesterId, mapper.writeValueAsString(mapOf(
-            "type" to "friend.request.accepted",
-            "requestId" to requestId.toString(),
-            "byUsername" to (accepter.username ?: accepter.phone),
-            "byElo" to accepter.elo,
-        )))
+        val accepterName = accepter.username ?: accepter.phone
+        if (sessions.get(f.requesterId) != null) {
+            sessions.send(f.requesterId, mapper.writeValueAsString(mapOf(
+                "type" to "friend.request.accepted",
+                "requestId" to requestId.toString(),
+                "byUsername" to accepterName,
+                "byElo" to accepter.elo,
+            )))
+        } else {
+            fcm.sendToUser(f.requesterId, "12 Pions", "$accepterName a accepté votre demande d'ami !")
+        }
     }
 
     @Transactional

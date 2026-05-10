@@ -23,6 +23,7 @@ import '../../features/friends/data/datasources/friends_remote_datasource.dart';
 import '../../features/friends/presentation/blocs/friends_bloc.dart';
 import '../../features/play/presentation/blocs/matchmaking/matchmaking_bloc.dart';
 import '../constants/api_endpoints.dart';
+import '../services/fcm_token_service.dart';
 import '../services/websocket_service.dart';
 import '../storage/auth_local_storage.dart';
 
@@ -57,6 +58,7 @@ Future<void> setupServiceLocator() async {
 
   sl.registerLazySingleton<AuthLocalStorage>(() => AuthLocalStorage(sl()));
   sl.registerLazySingleton<WebSocketService>(() => WebSocketService());
+  sl.registerLazySingleton<FcmTokenService>(() => FcmTokenService(sl(), sl()));
 
   // ─── Auth ────────────────────────────────────────────────────────────────
 

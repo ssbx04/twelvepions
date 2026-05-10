@@ -44,6 +44,10 @@ class ChallengeRegistry {
             id to c.targetId
         }
 
+    /** Retourne le défi en attente pour cette cible (s'il existe). */
+    fun getPendingForTarget(targetId: UUID): Pair<UUID, Challenge>? =
+        pending.entries.firstOrNull { it.value.targetId == targetId }?.let { it.key to it.value }
+
     /** Annule tous les défis reçus par ce joueur (déconnexion). */
     fun cancelByTarget(targetId: UUID): List<Pair<UUID, UUID>> =
         pending.filter { it.value.targetId == targetId }.map { (id, c) ->

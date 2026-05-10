@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -19,11 +20,32 @@ class NotificationService {
 
     await _notificationsPlugin.initialize(initSettings);
 
-    // Demander la permission sur Android 13+
     _notificationsPlugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+
+    // Afficher les notifications FCM en foreground via flutter_local_notifications.
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final title = message.notification?.title ?? '12 Pions';
+      final body = message.notification?.body ?? '';
+      if (body.isNotEmpty) showFcmNotification(title, body);
+    });
+  }
+
+  Future<void> showFcmNotification(String title, String body) async {
+    const androidDetails = AndroidNotificationDetails(
+      'fcm_channel_id',
+      'Notifications 12 Pions',
+      channelDescription: 'Défis, demandes d\'ami et résultats de partie',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+    await _notificationsPlugin.show(1, title, body, notificationDetails);
   }
 
   Future<void> showOtpNotification(String otp) async {

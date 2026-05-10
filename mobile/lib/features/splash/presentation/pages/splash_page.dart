@@ -9,6 +9,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/fcm_token_service.dart';
 import '../../../../core/storage/auth_local_storage.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 
@@ -56,19 +57,18 @@ class _SplashPageState extends State<SplashPage> {
     final result = await repo.getMe();
     return result.fold(
       (failure) async {
-        // Token expiré / invalide → on efface et on renvoie sur /phone.
         if (failure is UnauthorizedFailure) {
           await repo.logout();
           return AppRoutes.phone;
         }
-        // Pas d'internet ou erreur serveur transitoire → on laisse passer
-        // sur la base du flag local. Un éventuel 401 plus tard déclenchera
-        // une déconnexion via le handler global.
         final complete = await storage.readProfileComplete();
         return complete ? AppRoutes.home : AppRoutes.completeProfile;
       },
-      (user) async =>
-          user.profileComplete ? AppRoutes.home : AppRoutes.completeProfile,
+      (user) async {
+        // Upload FCM token maintenant qu'on sait que le JWT est valide.
+        sl<FcmTokenService>().init();
+        return user.profileComplete ? AppRoutes.home : AppRoutes.completeProfile;
+      },
     );
   }
 

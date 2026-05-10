@@ -3,6 +3,7 @@ package sn.twelvepions.ws
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import sn.twelvepions.config.FcmService
 import sn.twelvepions.game.GameService
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
@@ -22,6 +23,7 @@ class ReconnectGuard(
     private val gameService: GameService,
     private val registry: SessionRegistry,
     private val turnTimer: TurnTimer,
+    private val fcm: FcmService,
     private val mapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(ReconnectGuard::class.java)
@@ -59,6 +61,8 @@ class ReconnectGuard(
                 mapOf("type" to "game.ended", "state" to state),
             )
             registry.broadcast(listOf(xId, oId), payload)
+            // userId est offline par définition ici
+            fcm.sendToUser(userId, "12 Pions", "Tu as perdu par forfait (déconnexion).")
         } catch (e: Exception) {
             log.error("Disconnect forfeit failed for user={} game={}", userId, gameId, e)
         }

@@ -10,6 +10,7 @@ import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/fcm_token_service.dart';
 import '../../../../core/widgets/app_background.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../blocs/otp/otp_bloc.dart';
@@ -121,6 +122,7 @@ class _OtpViewState extends State<_OtpView> {
           child: BlocConsumer<OtpBloc, OtpState>(
             listener: (context, state) {
               if (state is OtpVerified) {
+                sl<FcmTokenService>().init();
                 if (state.session.profileComplete) {
                   context.go(AppRoutes.home);
                 } else {

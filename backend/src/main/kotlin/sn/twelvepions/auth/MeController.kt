@@ -1,8 +1,11 @@
 package sn.twelvepions.auth
 
 import org.springframework.data.domain.PageRequest
+import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -15,10 +18,25 @@ import java.util.UUID
 @RequestMapping("/me")
 class MeController(
     private val authService: AuthService,
+    private val userRepository: UserRepository,
     private val gameRepository: GameRepository,
 ) {
     @GetMapping
     fun me(@AuthenticationPrincipal userId: UUID): UserDto = authService.getUser(userId)
+
+    @PostMapping("/fcm-token")
+    fun updateFcmToken(
+        @AuthenticationPrincipal userId: UUID,
+        @RequestBody body: Map<String, String>,
+    ): ResponseEntity<Void> {
+        val token = body["token"]?.takeIf { it.isNotBlank() }
+            ?: return ResponseEntity.badRequest().build()
+        userRepository.findById(userId).ifPresent { user ->
+            user.fcmToken = token
+            userRepository.save(user)
+        }
+        return ResponseEntity.ok().build()
+    }
 
     @GetMapping("/games")
     fun recentGames(

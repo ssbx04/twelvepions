@@ -3,6 +3,7 @@ package sn.twelvepions.ws
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import sn.twelvepions.config.FcmService
 import sn.twelvepions.game.GameService
 import tools.jackson.databind.ObjectMapper
 import java.util.UUID
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 class TurnTimer(
     private val gameService: GameService,
     private val registry: SessionRegistry,
+    private val fcm: FcmService,
     private val mapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(TurnTimer::class.java)
@@ -79,6 +81,9 @@ class TurnTimer(
                 mapOf("type" to "game.ended", "state" to state),
             )
             registry.broadcast(listOf(xId, oId), payload)
+            listOf(xId, oId).filter { registry.get(it) == null }.forEach { offlineId ->
+                fcm.sendToUser(offlineId, "12 Pions", "Tu as perdu par forfait (temps écoulé).")
+            }
         } catch (e: Exception) {
             log.error("Turn timeout failed for game={}", gameId, e)
         }

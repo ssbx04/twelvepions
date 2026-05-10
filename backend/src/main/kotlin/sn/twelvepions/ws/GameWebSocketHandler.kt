@@ -17,6 +17,7 @@ import sn.twelvepions.game.ai.dto.PositionDto
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import sn.twelvepions.auth.AuthService
+import sn.twelvepions.config.FcmService
 import sn.twelvepions.friends.FriendshipRepository
 import sn.twelvepions.game.ai.Mariama
 import sn.twelvepions.game.ai.FindBestMoveOptions
@@ -62,6 +63,7 @@ class GameWebSocketHandler(
     private val drawOffers: DrawOfferRegistry,
     private val oopsRegistry: OopsRegistry,
     private val challenges: ChallengeRegistry,
+    private val fcm: FcmService,
     private val mapper: ObjectMapper,
 ) : TextWebSocketHandler() {
     private val log = LoggerFactory.getLogger(GameWebSocketHandler::class.java)
@@ -72,6 +74,20 @@ class GameWebSocketHandler(
         log.info("WS connected: user={} ({} online)", userId, registry.onlineCount)
         pushPresence(userId, "ONLINE")
         sendJson(session, mapOf("type" to "connected", "userId" to userId.toString()))
+
+        // Défi en attente créé pendant que l'utilisateur était offline → le livrer maintenant.
+        challenges.getPendingForTarget(userId)?.let { (challengeId, challenge) ->
+            val challenger = runCatching { authService.getUser(challenge.challengerId) }.getOrNull()
+            if (challenger != null) {
+                sendJson(session, mapOf(
+                    "type" to "game.challenge.received",
+                    "challengeId" to challengeId.toString(),
+                    "challengerId" to challenge.challengerId.toString(),
+                    "challengerUsername" to (challenger.username ?: challenger.phone),
+                    "challengerElo" to challenger.elo,
+                ))
+            }
+        }
 
         // Si une partie est en cours, renvoyer son état au joueur qui revient
         // (et reprendre le turn timer suspendu par la déconnexion).
@@ -414,12 +430,12 @@ class GameWebSocketHandler(
             ?: run { sendError(session, "bad_payload", "targetId manquant ou invalide"); return }
 
         if (targetId == userId) { sendError(session, "bad_challenge", "Impossible de se défier soi-même"); return }
-        if (registry.get(targetId) == null) { sendError(session, "target_offline", "Ce joueur est hors ligne"); return }
         if (gameService.findActiveGameOf(targetId) != null) { sendError(session, "target_in_game", "Ce joueur est déjà en partie"); return }
         if (gameService.findActiveGameOf(userId) != null) { sendError(session, "already_in_game", "Tu es déjà en partie"); return }
 
         val challenger = authService.getUser(userId)
         val challengeId = UUID.randomUUID()
+        val targetOnline = registry.get(targetId) != null
 
         challenges.create(challengeId, userId, targetId) { expiredId ->
             registry.send(userId, mapper.writeValueAsString(
@@ -430,13 +446,18 @@ class GameWebSocketHandler(
             ))
         }
 
-        registry.send(targetId, mapper.writeValueAsString(mapOf(
-            "type" to "game.challenge.received",
-            "challengeId" to challengeId.toString(),
-            "challengerId" to userId.toString(),
-            "challengerUsername" to (challenger.username ?: challenger.phone),
-            "challengerElo" to challenger.elo,
-        )))
+        if (targetOnline) {
+            registry.send(targetId, mapper.writeValueAsString(mapOf(
+                "type" to "game.challenge.received",
+                "challengeId" to challengeId.toString(),
+                "challengerId" to userId.toString(),
+                "challengerUsername" to (challenger.username ?: challenger.phone),
+                "challengerElo" to challenger.elo,
+            )))
+        } else {
+            fcm.sendToUser(targetId, "12 Pions",
+                "${challenger.username ?: "Un joueur"} vous défie ! Ouvrez l'app pour accepter.")
+        }
         sendJson(session, mapOf("type" to "game.challenge.sent", "challengeId" to challengeId.toString()))
     }
 

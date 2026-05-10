@@ -32,6 +32,9 @@ class User(
     @Column(nullable = false)
     var elo: Int = 1000,
 
+    @Column(name = "fcm_token")
+    var fcmToken: String? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: Instant = Instant.now(),
 
